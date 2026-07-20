@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Комната трансляции экрана." />
+    <title>Mirrised — комната</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <main class="page-shell room-page">
+      <header class="app-header">
+        <a class="brand" href="/" aria-label="Mirrised — главная">
+          <span class="brand-mark" aria-hidden="true">↗</span>
+          <span>Mirrised</span>
+        </a>
+        <a class="back-link" href="/">На главную</a>
+      </header>
+
+      <section class="room-card" aria-labelledby="room-title">
+        <div class="room-heading">
+          <div>
+            <p class="eyebrow">Комната трансляции</p>
+            <h1 id="room-title">Подключение к комнате…</h1>
+            <p id="room-status" class="room-note" role="status" aria-live="polite">Проверяем комнату…</p>
+          </div>
+          <span id="role-label" class="role-badge" data-role="pending">Роль: ожидание</span>
+        </div>
+
+        <section class="room-details" aria-label="Данные комнаты">
+          <div class="detail-card">
+            <span class="detail-label">Код комнаты</span>
+            <output id="room-id" class="room-id">—</output>
+          </div>
+          <div class="detail-card link-detail">
+            <label class="detail-label" for="share-link">Ссылка для зрителя</label>
+            <div class="copy-row">
+              <input id="share-link" type="text" readonly aria-label="Ссылка для зрителя" />
+              <button id="copy-link" class="button button-secondary button-compact" type="button" disabled>Копировать</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="status-grid" aria-label="Статусы подключения">
+          <article id="connection-status-card" class="status-card" data-status="waiting">
+            <span class="status-label">Подключение</span>
+            <strong id="connection-status">Ожидание ведущего</strong>
+          </article>
+          <article id="webrtc-status-card" class="status-card" data-status="waiting">
+            <span class="status-label">WebRTC</span>
+            <strong id="webrtc-status">Ожидание соединения</strong>
+          </article>
+        </section>
+
+        <p id="error-box" class="error-box" role="alert" hidden></p>
+
+        <form id="room-pin-form" class="pin-form" hidden>
+          <p>Комната защищена PIN-кодом. PIN не передаётся в ссылке.</p>
+          <label for="room-pin">PIN-код комнаты</label>
+          <div class="input-row">
+            <input id="room-pin" name="room-pin" type="password" inputmode="numeric" autocomplete="one-time-code" maxlength="8" pattern="[0-9]{4,8}" placeholder="4–8 цифр" required />
+            <button id="submit-room-pin" class="button button-secondary" type="submit">Подтвердить</button>
+          </div>
+          <p id="pin-feedback" class="pin-feedback" role="status" aria-live="polite"></p>
+        </form>
+
+        <section class="video-panel" aria-labelledby="video-title">
+          <div class="video-panel-heading">
+            <div>
+              <p class="eyebrow">Видео</p>
+              <h2 id="video-title">Трансляция экрана</h2>
+            </div>
+          </div>
+          <div class="video-stage">
+            <div id="video-placeholder" class="video-placeholder">
+              <span class="video-placeholder-icon" aria-hidden="true">▣</span>
+              <p>Видео появится здесь после начала трансляции.</p>
+            </div>
+            <video id="local-preview" class="local-preview" autoplay muted playsinline controls hidden></video>
+            <div id="viewer-stream" class="viewer-stream" hidden>
+              <p id="remote-stream-state" class="remote-stream-state" role="status" aria-live="polite">Ожидаем трансляцию ведущего.</p>
+              <video id="remote-preview" class="remote-preview" autoplay playsinline controls hidden></video>
+            </div>
+          </div>
+        </section>
+
+        <div class="control-bar">
+          <section id="host-controls" class="host-controls" hidden aria-label="Управление трансляцией">
+            <p id="share-state" class="share-state" data-state="idle" role="status" aria-live="polite">Трансляция не запущена</p>
+            <div class="share-actions">
+              <button id="start-share" class="button button-primary" type="button" disabled>Начать трансляцию</button>
+              <button id="stop-share" class="button button-danger" type="button" disabled>Остановить</button>
+            </div>
+          </section>
+          <button id="leave-room" class="button button-ghost" type="button" disabled>Выйти из комнаты</button>
+        </div>
+        <p class="privacy-note">Вы сами выбираете экран в системном окне браузера. Видеопоток не записывается и не сохраняется на сервере.</p>
+      </section>
+    </main>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/app.js"></script>
+  </body>
+</html>

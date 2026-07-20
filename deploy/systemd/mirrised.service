@@ -1,0 +1,22 @@
+[Unit]
+Description=Mirrised WebRTC screen sharing
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/mirrised
+Environment=NODE_ENV=production
+Environment=PORT=3000
+EnvironmentFile=-/etc/mirrised/mirrised.env
+ExecStart=/usr/bin/npm --prefix /opt/mirrised run start:prod
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=full
+
+[Install]
+WantedBy=multi-user.target

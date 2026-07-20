@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Простая безопасная трансляция экрана прямо в браузере." />
+    <title>Mirrised — трансляция экрана</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <main class="page-shell home-page">
+      <header class="app-header">
+        <a class="brand" href="/" aria-label="Mirrised — главная">
+          <span class="brand-mark" aria-hidden="true">↗</span>
+          <span>Mirrised</span>
+        </a>
+        <span class="secure-label">Защищённое подключение</span>
+      </header>
+
+      <section class="hero" aria-labelledby="page-title">
+        <p class="eyebrow">Трансляция экрана в браузере</p>
+        <h1 id="page-title">Покажите экран без установки программ</h1>
+        <p class="intro">Ведущий создаёт комнату, зритель открывает ссылку, а изображение передаётся напрямую между браузерами.</p>
+      </section>
+
+      <section class="action-grid" aria-label="Управление комнатой">
+        <article class="action-card action-card-primary">
+          <div class="card-icon" aria-hidden="true">1</div>
+          <h2>Начните показ</h2>
+          <p>Создайте приватную комнату и получите ссылку для зрителя.</p>
+          <form id="create-room-form">
+            <label for="room-pin-create">PIN-код (необязательно)</label>
+            <input id="room-pin-create" name="room-pin-create" type="password" inputmode="numeric" autocomplete="new-password" maxlength="8" pattern="[0-9]{4,8}" placeholder="4–8 цифр" />
+            <button class="button button-primary" type="submit">Создать комнату</button>
+          </form>
+        </article>
+
+        <article class="action-card">
+          <div class="card-icon" aria-hidden="true">2</div>
+          <h2>Подключитесь к показу</h2>
+          <p>Введите код комнаты, который отправил ведущий.</p>
+          <form id="join-room-form">
+            <label for="room-code">Код комнаты</label>
+            <div class="input-row">
+              <input id="room-code" name="room-code" type="text" autocomplete="off" maxlength="22" placeholder="Код из ссылки ведущего" required />
+              <button class="button button-secondary" type="submit">Подключиться</button>
+            </div>
+          </form>
+        </article>
+      </section>
+
+      <p id="status" class="status" role="status" aria-live="polite"></p>
+
+      <section class="how-it-works" aria-labelledby="how-title">
+        <div>
+          <p class="eyebrow">Как это работает</p>
+          <h2 id="how-title">Три простых шага</h2>
+        </div>
+        <ol class="steps-list">
+          <li><strong>Создайте комнату.</strong> Ведущий получает приватную ссылку.</li>
+          <li><strong>Отправьте ссылку.</strong> В комнате может быть один зритель.</li>
+          <li><strong>Выберите экран.</strong> Браузер покажет системное окно выбора.</li>
+        </ol>
+      </section>
+
+      <aside class="notice" role="note">
+        <span aria-hidden="true">ⓘ</span>
+        <p>Вы сами выбираете, какой экран или окно показать. Захват не запускается автоматически, а сервер не записывает видеопоток.</p>
+      </aside>
+    </main>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/app.js"></script>
+  </body>
+</html>
