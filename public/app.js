@@ -196,7 +196,10 @@
         console.warn('WebRTC connection timeout');
         showError(message);
         setWebRTCStatus('error', 'Подключение не установлено');
-        if (connection === hostPeerConnection) stopSharing('Подключение к зрителю заняло слишком много времени.');
+        if (connection === hostPeerConnection) {
+          preserveHostShare('Подключение к зрителю заняло слишком много времени.');
+          return;
+        }
         if (connection === viewerPeerConnection) stopRemotePlayback('Подключение к трансляции заняло слишком много времени.');
       }, WEBRTC_TIMEOUT_MS);
     };
@@ -281,7 +284,30 @@
       showVideoPlaceholder();
     };
 
+    const preserveHostShare = (message) => {
+      if (!localStream) {
+        closeForCriticalError(message);
+        return;
+      }
+
+      console.warn(message);
+      viewerConnected = false;
+      closeHostConnection();
+      clearError();
+      roomTitle.textContent = 'Ожидание зрителя';
+      setRoomStatus(message);
+      setConnectionStatus('waiting', 'Ожидание зрителя');
+      setWebRTCStatus('waiting', 'Ожидание нового соединения');
+      setShareState('active', 'Захват экрана активен. Ожидаем нового зрителя.');
+      startShareButton.disabled = true;
+      stopShareButton.disabled = false;
+    };
+
     const closeForCriticalError = (message) => {
+      if (role === 'host' && localStream) {
+        preserveHostShare(message);
+        return;
+      }
       console.error(message);
       closeHostConnection();
       stopRemotePlayback(message);
