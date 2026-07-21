@@ -37,6 +37,8 @@ label, .detail-label { display: block; margin-bottom: 8px; color: #d6dcf5; font-
 input { min-width: 0; width: 100%; border: 1px solid #64709e; border-radius: 11px; padding: 12px 13px; background: #10172d; color: #f8f9ff; }
 input::placeholder { color: #8490b4; }
 input:focus { border-color: #b0bdff; box-shadow: 0 0 0 3px rgba(176, 189, 255, .18); }
+#room-mode-create { width: 100%; margin-bottom: 8px; border: 1px solid #64709e; border-radius: 11px; padding: 12px 13px; background: #10172d; color: #f8f9ff; }
+.form-hint { margin: 0 0 16px; color: #98a4c5; font-size: .85rem; line-height: 1.45; }
 
 .button { display: inline-flex; align-items: center; justify-content: center; min-height: 46px; border: 1px solid transparent; border-radius: 11px; padding: 11px 16px; cursor: pointer; font-weight: 800; transition: transform .15s ease, filter .15s ease, background .15s ease; }
 .button:hover:not(:disabled) { transform: translateY(-1px); filter: brightness(1.08); }
