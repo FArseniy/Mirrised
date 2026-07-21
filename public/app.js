@@ -59,6 +59,11 @@
     let turnCredentialsPromise = Promise.resolve();
     let connectionTimeoutId = null;
     let iceDisconnectTimeoutId = null;
+    let hasSocketConnected = false;
+    let viewerPin = '';
+    let viewerRejoinTimer = null;
+    let viewerRejoinAttempts = 0;
+    const MAX_VIEWER_REJOIN_ATTEMPTS = 4;
     const pendingIceCandidates = new Map();
 
     roomIdOutput.textContent = roomId || 'Не указан';
@@ -493,46 +498,7 @@
         setShareState('active', 'Трансляция активна. Ожидаем или подключаем зрителя.');
         setWebRTCStatus(viewerConnected ? 'connecting' : 'waiting', viewerConnected ? 'Установка соединения' : 'Ожидание зрителя');
         await createHostConnection();
-      } catch (error) {
-        const streamToStop = localStream;
-        localStream = null;
-        streamToStop?.getTracks().forEach((track) => track.stop());
-        localPreview.srcObject = null;
-        localPreview.hidden = true;
-        showVideoPlaceholder();
-        startShareButton.disabled = false;
-        stopShareButton.disabled = true;
-
-        console.error('Не удалось получить доступ к экрану:', error);
-
-        if (error?.name === 'AbortError') {
-          setShareState('error', 'Вы закрыли окно выбора экрана. Трансляция не началась.');
-          showError('Вы закрыли окно выбора экрана. Когда будете готовы, нажмите «Начать трансляцию» ещё раз.');
-          return;
-        }
-
-        if (error?.name === 'NotAllowedError') {
-          setShareState('error', 'Доступ к экрану не предоставлен. Попробуйте ещё раз, когда будете готовы.');
-          showError('Доступ к экрану не предоставлен. Захват запускается только после вашего выбора в системном окне браузера.');
-          return;
-        }
-
-        setShareState('error', 'Не удалось начать захват экрана. Проверьте настройки браузера и повторите попытку.');
-        showError('Не удалось начать захват экрана. Проверьте настройки браузера и повторите попытку.');
-      }
-    };
-
-    const createViewerConnection = (sessionId) => {
-      if (!window.RTCPeerConnection) {
-        closeForCriticalError('Ваш браузер не поддерживает WebRTC-трансляцию.');
-        return null;
-      }
-
-      let connection;
-      try {
-        connection = new RTCPeerConnection(rtcConfiguration);
-      } catch (error) {
-        console.error('Не удалось создать RTCPeerConnection зрителя:', error);
+      } catch (error…531 tokens truncated…я:', error);
         closeForCriticalError('Не удалось создать WebRTC-соединение для просмотра.');
         return null;
       }
@@ -658,11 +624,12 @@
 
     socket = io({
       transports: ['websocket'],
-      reconnectionAttempts: 3,
+      reconnectionAttempts: 5,
       reconnectionDelay: 1_000,
       reconnectionDelayMax: 5_000
     });
-    const requestJoin = (pin = '') => {
+    const requestJoin = (pin = viewerPin) => {
+      if (!isHostIntent) viewerPin = pin;
       socket.emit('join-room', {
         roomId,
         intent: isHostIntent ? 'host' : 'viewer',
@@ -670,6 +637,39 @@
         pin: isHostIntent ? undefined : pin
       });
     };
+
+    const clearViewerRejoin = () => {
+      window.clearTimeout(viewerRejoinTimer);
+      viewerRejoinTimer = null;
+      viewerRejoinAttempts = 0;
+    };
+
+    const scheduleViewerRejoin = () => {
+      if (
+        isHostIntent ||
+        role !== 'viewer' ||
+        !socket.connected ||
+        viewerRejoinAttempts >= MAX_VIEWER_REJOIN_ATTEMPTS
+      ) {
+        return;
+      }
+
+      window.clearTimeout(viewerRejoinTimer);
+      viewerRejoinAttempts += 1;
+      viewerRejoinTimer = window.setTimeout(() => {
+        if (socket.connected && role === 'viewer') requestJoin();
+      }, 2_000);
+    };
+
+    socket.on('connect', () => {
+      if (hasSocketConnected && role === 'viewer') {
+        clearError();
+        setRoomStatus('Восстанавливаем подключение к комнате…');
+        setConnectionStatus('connecting', 'Восстанавливаем подключение');
+        requestJoin();
+      }
+      hasSocketConnected = true;
+    });
     requestJoin();
 
     pinForm.addEventListener('submit', (event) => {
@@ -724,6 +724,7 @@
 
     socket.on('room-joined', async () => {
       role = 'viewer';
+      clearViewerRejoin();
       pinForm.hidden = true;
       turnCredentialsPromise = loadTurnCredentials();
       await turnCredentialsPromise;
@@ -770,6 +771,15 @@
     });
 
     socket.on('room-full', ({ message }) => {
+      if (!isHostIntent && role === 'viewer') {
+        clearError();
+        roomTitle.textContent = 'Восстанавливаем подключение';
+        setRoomStatus('Освобождаем прежнее подключение. Это обычно занимает несколько секунд.');
+        setConnectionStatus('connecting', 'Ожидаем освобождения места');
+        setWebRTCStatus('waiting', 'Ожидаем новое соединение');
+        scheduleViewerRejoin();
+        return;
+      }
       roomTitle.textContent = 'Комната занята';
       setRoomStatus(message);
       setConnectionStatus('error', 'Подключение недоступно');
@@ -884,12 +894,15 @@
     socket.on('disconnect', (reason) => {
       console.warn('Socket.IO disconnected:', reason);
       if (!role) return;
+      window.clearTimeout(viewerRejoinTimer);
+      viewerRejoinTimer = null;
       closeForCriticalError('Соединение с сервером потеряно. Для продолжения откройте комнату заново.');
       setConnectionStatus('error', 'Соединение потеряно');
       setRoomStatus('Соединение с сервером потеряно. Автоматическое подключение ограничено.');
     });
 
     window.addEventListener('beforeunload', () => {
+      window.clearTimeout(viewerRejoinTimer);
       clearConnectionTimeout();
       clearIceDisconnectTimeout();
       closeHostConnection();
