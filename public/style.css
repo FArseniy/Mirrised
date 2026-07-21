@@ -74,11 +74,14 @@ input:focus { border-color: #b0bdff; box-shadow: 0 0 0 3px rgba(176, 189, 255, .
 .room-id { display: block; overflow-wrap: anywhere; color: #fff; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: clamp(1.05rem, 3vw, 1.5rem); font-weight: 850; letter-spacing: .04em; }
 .copy-row input { overflow: hidden; text-overflow: ellipsis; }
 
-.status-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 14px; }
+.status-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 14px; }
 .status-card { padding: 15px 16px; border: 1px solid rgba(215,224,255,.12); border-left: 4px solid #8894bd; border-radius: 14px; background: rgba(13, 19, 38, .54); }
 .status-card[data-status="connecting"] { border-left-color: #ffd37d; }
 .status-card[data-status="active"] { border-left-color: #7ce0a4; }
 .status-card[data-status="error"], .status-card[data-status="ended"] { border-left-color: #ff9a9f; }
+.status-card[data-route="p2p"] { border-left-color: #7ce0a4; }
+.status-card[data-route="relay"] { border-left-color: #aebcff; }
+.status-card[data-route="detecting"] { border-left-color: #ffd37d; }
 .status-label { display: block; margin-bottom: 5px; color: #a9b3d1; font-size: .78rem; font-weight: 750; letter-spacing: .07em; text-transform: uppercase; }
 .status-card strong { display: block; color: #f5f7ff; font-size: .98rem; }
 .error-box { margin: 14px 0 0; padding: 13px 15px; border: 1px solid rgba(255, 145, 151, .52); border-radius: 12px; background: rgba(117, 37, 49, .35); color: #ffd9da; line-height: 1.45; }
