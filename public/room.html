@@ -91,6 +91,16 @@
         <div class="control-bar">
           <section id="host-controls" class="host-controls" hidden aria-label="Управление трансляцией">
             <p id="share-state" class="share-state" data-state="idle" role="status" aria-live="polite">Трансляция не запущена</p>
+            <label class="quality-control" for="share-quality">
+              <span>Качество трансляции</span>
+              <select id="share-quality" aria-describedby="share-quality-hint">
+                <option value="economy">Экономия — до 720p, 15 fps</option>
+                <option value="standard" selected>Стандарт — до 1080p, 30 fps</option>
+                <option value="high">Высокое — до 2K, 60 fps</option>
+                <option value="maximum">Максимум — без ограничений</option>
+              </select>
+            </label>
+            <p id="share-quality-hint" class="quality-hint">Браузер подберёт доступное качество. Режим «Максимум» не ограничивает разрешение или частоту кадров.</p>
             <div class="share-actions">
               <button id="start-share" class="button button-primary" type="button" disabled>Начать трансляцию</button>
               <button id="stop-share" class="button button-danger" type="button" disabled>Остановить</button>
