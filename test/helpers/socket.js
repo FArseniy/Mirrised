@@ -43,8 +43,8 @@ async function connect(url) {
   return socket;
 }
 
-async function createRoom(hostSocket, pin = '') {
-  const created = await emitWithAck(hostSocket, 'create-room', { pin });
+async function createRoom(hostSocket, pin = '', mode = 'reliable') {
+  const created = await emitWithAck(hostSocket, 'create-room', { pin, mode });
   if (!created?.ok) throw new Error(created?.message || 'Unable to reserve room');
 
   const roomCreated = once(hostSocket, 'room-created');
