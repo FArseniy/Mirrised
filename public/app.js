@@ -7,28 +7,20 @@
   const MAX_PENDING_ICE_CANDIDATES = 128;
   const SHARE_QUALITY_PRESETS = Object.freeze({
     economy: {
-      video: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 15 } },
-      hint: 'До 720p и 15 fps — подходит для медленного соединения и экономит трафик.'
+      video: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } },
+      hint: 'До 720p и 30 fps — плавный режим с экономным расходом трафика.'
     },
     standard: {
       video: { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } },
       hint: 'До 1080p и 30 fps — сбалансированный режим для большинства трансляций.'
     },
-    'crisp-5': {
-      video: { width: { ideal: 2560 }, height: { ideal: 1440 }, frameRate: { ideal: 5 } },
-      hint: 'До 2K и 5 fps — чёткий статичный экран с минимальной нагрузкой на сеть.'
-    },
-    'crisp-15': {
-      video: { width: { ideal: 2560 }, height: { ideal: 1440 }, frameRate: { ideal: 15 } },
-      hint: 'До 2K и 15 fps — чёткий экран для документов, кода и медленных действий.'
+    crisp: {
+      video: { width: { ideal: 2560 }, height: { ideal: 1440 }, frameRate: { ideal: 10 } },
+      hint: 'До 2K и 10 fps — чёткий экран для документов, кода и неспешных действий.'
     },
     high: {
       video: { width: { ideal: 2560 }, height: { ideal: 1440 }, frameRate: { ideal: 60 } },
       hint: 'До 2K и 60 fps — нужна хорошая производительность и высокая исходящая скорость.'
-    },
-    maximum: {
-      video: true,
-      hint: 'Без ограничений: браузер может передать 2K/60 fps и выше, если это поддерживает выбранный экран.'
     }
   });
 
@@ -91,6 +83,7 @@
     const MAX_VIEWER_REJOIN_ATTEMPTS = 4;
     const viewerIds = new Set();
     const hostConnections = new Map();
+    const hostRouteStates = new Map();
     let roomConfig = { mode: 'reliable', modeLabel: 'P2P с TURN', maxViewers: 1, allowTurn: true };
     const pendingIceCandidates = new Map();
 
@@ -115,13 +108,35 @@
       routeStatus.textContent = message;
     };
 
-    const updateRouteStatus = async (connection) => {
-      if (!connection || connection.connectionState === 'closed') {
+    const updateHostRouteStatus = () => {
+      const routes = [...hostRouteStates.values()];
+      if (!routes.length) {
         setRouteStatus('waiting', 'Определится после подключения');
         return;
       }
+      const hasP2P = routes.includes('p2p');
+      const hasRelay = routes.includes('relay');
+      if (hasP2P && hasRelay) {
+        setRouteStatus('mixed', 'P2P + TURN');
+      } else if (hasRelay) {
+        setRouteStatus('relay', 'Через TURN-сервер');
+      } else {
+        setRouteStatus('p2p', 'P2P напрямую');
+      }
+    };
 
-      setRouteStatus('detecting', 'Определяем маршрут…');
+    const updateRouteStatus = async (connection, viewerId) => {
+      if (!connection || connection.connectionState === 'closed') {
+        if (viewerId) {
+          hostRouteStates.delete(viewerId);
+          updateHostRouteStatus();
+        } else {
+          setRouteStatus('waiting', 'Определится после подключения');
+        }
+        return;
+      }
+
+      if (!viewerId || !hostRouteStates.size) setRouteStatus('detecting', 'Определяем маршрут…');
       try {
         const stats = await connection.getStats();
         let candidatePair = null;
@@ -143,17 +158,24 @@
         }
 
         if (!candidatePair) {
-          setRouteStatus('waiting', 'Маршрут пока не определён');
+          if (viewerId) updateHostRouteStatus();
+          else setRouteStatus('waiting', 'Маршрут пока не определён');
           return;
         }
 
         const localCandidate = stats.get(candidatePair.localCandidateId);
         const remoteCandidate = stats.get(candidatePair.remoteCandidateId);
         const usesRelay = localCandidate?.candidateType === 'relay' || remoteCandidate?.candidateType === 'relay';
-        setRouteStatus(usesRelay ? 'relay' : 'p2p', usesRelay ? 'Через TURN-сервер' : 'P2P напрямую');
+        if (viewerId) {
+          hostRouteStates.set(viewerId, usesRelay ? 'relay' : 'p2p');
+          updateHostRouteStatus();
+        } else {
+          setRouteStatus(usesRelay ? 'relay' : 'p2p', usesRelay ? 'Через TURN-сервер' : 'P2P напрямую');
+        }
       } catch (error) {
         console.warn('Unable to determine the selected WebRTC route:', error);
-        setRouteStatus('waiting', 'Маршрут не удалось определить');
+        if (viewerId) updateHostRouteStatus();
+        else setRouteStatus('waiting', 'Маршрут не удалось определить');
       }
     };
 
@@ -330,7 +352,8 @@
       entry.connection.onsignalingstatechange = null;
       entry.connection.close();
       hostConnections.delete(viewerId);
-      if (!hostConnections.size) setRouteStatus('waiting', 'Определится после подключения');
+      hostRouteStates.delete(viewerId);
+      updateHostRouteStatus();
     };
 
     const handleHostConnectionFailure = (viewerId, message) => {
@@ -490,7 +513,7 @@
         if (connection.connectionState === 'connected') {
           clearHostConnectionTimers(entry);
           setWebRTCStatus('active', roomConfig.maxViewers > 1 ? `Трансляция активна: ${hostConnections.size} соединений` : 'Трансляция активна');
-          void updateRouteStatus(connection);
+          void updateRouteStatus(connection, viewerId);
         } else if (connection.connectionState === 'disconnected') {
           setWebRTCStatus('connecting', 'Соединение со зрителем нестабильно');
           startHostIceDisconnectTimeout('WebRTC-соединение со зрителем потеряно.');
@@ -507,7 +530,7 @@
         } else if (connection.iceConnectionState === 'connected' || connection.iceConnectionState === 'completed') {
           window.clearTimeout(entry.iceDisconnectTimeoutId);
           entry.iceDisconnectTimeoutId = null;
-          void updateRouteStatus(connection);
+          void updateRouteStatus(connection, viewerId);
         } else if (connection.iceConnectionState === 'disconnected') {
           startHostIceDisconnectTimeout('ICE-соединение со зрителем было разорвано.');
         } else if (connection.iceConnectionState === 'failed') {
