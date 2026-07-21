@@ -74,7 +74,7 @@ test('admits only a host and one viewer', async () => {
   const full = once(thirdClient, 'room-full');
   thirdClient.emit('join-room', { roomId, intent: 'viewer' });
 
-  assert.match((await full).message, /ведущий.*зрител/i);
+  assert.match((await full).message, /максимум.*1/i);
 });
 
 test('notifies the host about viewer departure and accepts a replacement viewer', async () => {
@@ -89,7 +89,7 @@ test('notifies the host about viewer departure and accepts a replacement viewer'
   assert.match((await disconnected).message, /зрител/i);
 
   await joinViewer(replacement, roomId);
-  assert.equal(rooms.get(roomId).viewerId, replacement.id);
+  assert.equal(rooms.get(roomId).viewerIds.has(replacement.id), true);
 });
 
 test('notifies the viewer and deletes the room when the host disconnects', async () => {
@@ -117,11 +117,57 @@ test('forwards SDP signalling only to the peer in the same room', async () => {
   let leaked = false;
   viewerB.once('webrtc-offer', () => { leaked = true; });
   const offer = once(viewerA, 'webrtc-offer');
-  hostA.emit('webrtc-offer', { sessionId: 'test-session', sdp: { type: 'offer', sdp: 'opaque-test-data' } });
+  hostA.emit('webrtc-offer', { targetId: viewerA.id, sessionId: 'test-session', sdp: { type: 'offer', sdp: 'opaque-test-data' } });
 
   assert.equal((await offer).sessionId, 'test-session');
   await new Promise((resolve) => setTimeout(resolve, 100));
   assert.equal(leaked, false);
+});
+
+test('admits up to six viewers in group mode and rejects the seventh', async () => {
+  const host = track(await connect(baseUrl));
+  const viewers = await Promise.all(Array.from({ length: 7 }, async () => track(await connect(baseUrl))));
+  const { roomId } = await createRoom(host, '', 'group');
+
+  for (const viewer of viewers.slice(0, 6)) await joinViewer(viewer, roomId);
+  assert.equal(rooms.get(roomId).viewerIds.size, 6);
+  assert.equal(rooms.get(roomId).mode.maxViewers, 6);
+
+  const full = once(viewers[6], 'room-full');
+  viewers[6].emit('join-room', { roomId, intent: 'viewer' });
+  assert.match((await full).message, /максимум/i);
+});
+
+test('keeps the direct mode limited to STUN and one viewer', async () => {
+  const host = track(await connect(baseUrl));
+  const viewer = track(await connect(baseUrl));
+  const { roomId } = await createRoom(host, '', 'direct');
+
+  const joined = await joinViewer(viewer, roomId);
+  assert.equal(joined.allowTurn, false);
+  assert.equal(joined.maxViewers, 1);
+  const turn = await emitWithAck(viewer, 'get-turn-credentials');
+  assert.equal(turn.allowTurn, false);
+  assert.equal(turn.iceServers.length, 1);
+});
+
+test('rejects a host signal addressed to a viewer outside its room', async () => {
+  const hostA = track(await connect(baseUrl));
+  const viewerA = track(await connect(baseUrl));
+  const hostB = track(await connect(baseUrl));
+  const viewerB = track(await connect(baseUrl));
+  const roomA = await createRoom(hostA, '', 'group');
+  const roomB = await createRoom(hostB);
+  await joinViewer(viewerA, roomA.roomId);
+  await joinViewer(viewerB, roomB.roomId);
+
+  const rejected = once(hostA, 'room-error');
+  hostA.emit('webrtc-offer', {
+    targetId: viewerB.id,
+    sessionId: 'wrong-target',
+    sdp: { type: 'offer', sdp: 'opaque' }
+  });
+  assert.match((await rejected).message, /получатель/i);
 });
 
 test('rejects a signalling message from the wrong room role', async () => {
