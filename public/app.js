@@ -576,6 +576,7 @@
     stopShareButton.addEventListener('click', () => stopSharing());
 
     socket = io({
+      transports: ['websocket'],
       reconnectionAttempts: 3,
       reconnectionDelay: 1_000,
       reconnectionDelayMax: 5_000
@@ -818,7 +819,12 @@
     return;
   }
 
-  const socket = io({ reconnectionAttempts: 3, reconnectionDelay: 1_000, reconnectionDelayMax: 5_000 });
+  const socket = io({
+    transports: ['websocket'],
+    reconnectionAttempts: 3,
+    reconnectionDelay: 1_000,
+    reconnectionDelayMax: 5_000
+  });
   const createForm = document.querySelector('#create-room-form');
   const joinForm = document.querySelector('#join-room-form');
   const roomCodeInput = document.querySelector('#room-code');
