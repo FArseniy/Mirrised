@@ -824,14 +824,32 @@
   const roomCodeInput = document.querySelector('#room-code');
   const createPinInput = document.querySelector('#room-pin-create');
   const status = document.querySelector('#status');
+  const createButton = createForm.querySelector('button');
 
   function setStatus(message) {
     status.textContent = message;
   }
 
+  const setCreateAvailability = (available) => {
+    createButton.disabled = !available;
+    createButton.textContent = available ? 'Создать комнату' : 'Подключаемся…';
+  };
+
+  setCreateAvailability(socket.connected);
+  if (!socket.connected) setStatus('Подключаемся к серверу…');
+
+  socket.on('connect', () => {
+    setCreateAvailability(true);
+    setStatus('');
+  });
+
+  socket.on('disconnect', () => {
+    setCreateAvailability(false);
+  });
+
   createForm.addEventListener('submit', (event) => {
     event.preventDefault();
-    const button = createForm.querySelector('button');
+    const button = createButton;
     const pin = createPinInput.value.trim();
     if (pin && !/^\d{4,8}$/.test(pin)) {
       setStatus('PIN должен состоять из 4–8 цифр.');
@@ -863,6 +881,7 @@
   });
 
   socket.on('connect_error', () => {
+    setCreateAvailability(false);
     setStatus('Нет подключения к серверу. Проверьте соединение и повторите попытку.');
   });
 })();
