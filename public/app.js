@@ -14,6 +14,14 @@
       video: { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } },
       hint: 'До 1080p и 30 fps — сбалансированный режим для большинства трансляций.'
     },
+    'crisp-5': {
+      video: { width: { ideal: 2560 }, height: { ideal: 1440 }, frameRate: { ideal: 5 } },
+      hint: 'До 2K и 5 fps — чёткий статичный экран с минимальной нагрузкой на сеть.'
+    },
+    'crisp-15': {
+      video: { width: { ideal: 2560 }, height: { ideal: 1440 }, frameRate: { ideal: 15 } },
+      hint: 'До 2K и 15 fps — чёткий экран для документов, кода и медленных действий.'
+    },
     high: {
       video: { width: { ideal: 2560 }, height: { ideal: 1440 }, frameRate: { ideal: 60 } },
       hint: 'До 2K и 60 fps — нужна хорошая производительность и высокая исходящая скорость.'
@@ -68,11 +76,8 @@
     const hostToken = params.get('token') || '';
 
     let role = null;
-    let viewerConnected = false;
     let localStream = null;
-    let hostPeerConnection = null;
     let viewerPeerConnection = null;
-    let hostSessionId = null;
     let viewerSessionId = null;
     let socket = null;
     let rtcConfiguration = DEFAULT_RTC_CONFIGURATION;
@@ -84,6 +89,9 @@
     let viewerRejoinTimer = null;
     let viewerRejoinAttempts = 0;
     const MAX_VIEWER_REJOIN_ATTEMPTS = 4;
+    const viewerIds = new Set();
+    const hostConnections = new Map();
+    let roomConfig = { mode: 'reliable', modeLabel: 'P2P с TURN', maxViewers: 1, allowTurn: true };
     const pendingIceCandidates = new Map();
 
     roomIdOutput.textContent = roomId || 'Не указан';
@@ -158,6 +166,27 @@
           : 'Роль: ожидание';
     };
 
+    const setRoomConfig = (config = {}) => {
+      roomConfig = {
+        ...roomConfig,
+        ...config
+      };
+    };
+
+    const updateHostViewerStatus = () => {
+      const count = viewerIds.size;
+      if (!count) {
+        setConnectionStatus('waiting', 'Ожидание зрителя');
+        if (localStream) setWebRTCStatus('waiting', 'Ожидание нового соединения');
+        return;
+      }
+      const label = roomConfig.maxViewers > 1
+        ? `Зрители: ${count} из ${roomConfig.maxViewers}`
+        : 'Зритель подключён';
+      setConnectionStatus('active', label);
+      if (localStream) setWebRTCStatus('connecting', 'Установка соединений со зрителями');
+    };
+
     const showError = (message) => {
       errorBox.textContent = message;
       errorBox.hidden = false;
@@ -205,6 +234,7 @@
         window.clearTimeout(timeoutId);
         if (response?.ok && Array.isArray(response.iceServers) && response.iceServers.length) {
           rtcConfiguration = { iceServers: response.iceServers };
+          if (typeof response.allowTurn === 'boolean') setRoomConfig({ allowTurn: response.allowTurn });
         } else if (response?.message) {
           console.warn('TURN credentials were not issued:', response.message);
         }
@@ -233,10 +263,6 @@
         console.warn('WebRTC connection timeout');
         showError(message);
         setWebRTCStatus('error', 'Подключение не установлено');
-        if (connection === hostPeerConnection) {
-          preserveHostShare('Подключение к зрителю заняло слишком много времени.');
-          return;
-        }
         if (connection === viewerPeerConnection) stopRemotePlayback('Подключение к трансляции заняло слишком много времени.');
       }, WEBRTC_TIMEOUT_MS);
     };
@@ -278,21 +304,42 @@
       }
     };
 
-    const closeHostConnection = () => {
-      clearConnectionTimeout();
-      clearIceDisconnectTimeout();
-      setRouteStatus('waiting', 'Определится после подключения');
-      const sessionId = hostSessionId;
-      hostSessionId = null;
-      pendingIceCandidates.delete(sessionId);
+    const clearHostConnectionTimers = (entry) => {
+      window.clearTimeout(entry?.connectionTimeoutId);
+      window.clearTimeout(entry?.iceDisconnectTimeoutId);
+      if (entry) {
+        entry.connectionTimeoutId = null;
+        entry.iceDisconnectTimeoutId = null;
+      }
+    };
 
-      if (!hostPeerConnection) return;
-      hostPeerConnection.onicecandidate = null;
-      hostPeerConnection.onconnectionstatechange = null;
-      hostPeerConnection.oniceconnectionstatechange = null;
-      hostPeerConnection.onsignalingstatechange = null;
-      hostPeerConnection.close();
-      hostPeerConnection = null;
+    const closeHostConnection = (viewerId) => {
+      if (!viewerId) {
+        for (const id of [...hostConnections.keys()]) closeHostConnection(id);
+        setRouteStatus('waiting', 'Определится после подключения');
+        return;
+      }
+
+      const entry = hostConnections.get(viewerId);
+      if (!entry) return;
+      clearHostConnectionTimers(entry);
+      pendingIceCandidates.delete(entry.sessionId);
+      entry.connection.onicecandidate = null;
+      entry.connection.onconnectionstatechange = null;
+      entry.connection.oniceconnectionstatechange = null;
+      entry.connection.onsignalingstatechange = null;
+      entry.connection.close();
+      hostConnections.delete(viewerId);
+      if (!hostConnections.size) setRouteStatus('waiting', 'Определится после подключения');
+    };
+
+    const handleHostConnectionFailure = (viewerId, message) => {
+      console.warn(message);
+      closeHostConnection(viewerId);
+      if (localStream) {
+        setRoomStatus(message);
+        setWebRTCStatus('waiting', 'Ожидаем повторное подключение зрителя');
+      }
     };
 
     const stopRemotePlayback = (message) => {
@@ -328,7 +375,6 @@
       }
 
       console.warn(message);
-      viewerConnected = false;
       closeHostConnection();
       clearError();
       roomTitle.textContent = 'Ожидание зрителя';
@@ -384,11 +430,11 @@
       }
     };
 
-    const createHostConnection = async () => {
-      if (!localStream || !viewerConnected || hostPeerConnection) return;
+    const createHostConnection = async (viewerId) => {
+      if (!localStream || !viewerId || !viewerIds.has(viewerId) || hostConnections.has(viewerId)) return;
 
       await turnCredentialsPromise;
-
+      if (!localStream || !viewerIds.has(viewerId) || hostConnections.has(viewerId)) return;
       if (!window.RTCPeerConnection) {
         closeForCriticalError('Ваш браузер не поддерживает WebRTC-трансляцию.');
         return;
@@ -399,64 +445,73 @@
         connection = new RTCPeerConnection(rtcConfiguration);
       } catch (error) {
         console.error('Не удалось создать RTCPeerConnection ведущего:', error);
-        closeForCriticalError('Не удалось создать WebRTC-соединение для трансляции.');
+        setWebRTCStatus('error', 'Не удалось создать соединение со зрителем');
         return;
       }
-      const sessionId = createSessionId();
-      hostPeerConnection = connection;
-      hostSessionId = sessionId;
+
+      const entry = {
+        connection,
+        sessionId: createSessionId(),
+        connectionTimeoutId: null,
+        iceDisconnectTimeoutId: null
+      };
+      hostConnections.set(viewerId, entry);
+
+      const isCurrent = () => hostConnections.get(viewerId) === entry;
+      const startHostConnectionTimeout = () => {
+        clearHostConnectionTimers(entry);
+        entry.connectionTimeoutId = window.setTimeout(() => {
+          if (isCurrent() && connection.connectionState !== 'connected' && connection.connectionState !== 'closed') {
+            handleHostConnectionFailure(viewerId, 'Подключение к зрителю не удалось установить вовремя.');
+          }
+        }, WEBRTC_TIMEOUT_MS);
+      };
+      const startHostIceDisconnectTimeout = (message) => {
+        window.clearTimeout(entry.iceDisconnectTimeoutId);
+        entry.iceDisconnectTimeoutId = window.setTimeout(() => {
+          if (isCurrent() && connection.connectionState === 'disconnected') {
+            handleHostConnectionFailure(viewerId, message);
+          }
+        }, 5_000);
+      };
 
       connection.onicecandidate = (event) => {
-        if (event.candidate && hostPeerConnection === connection && socket?.connected) {
+        if (event.candidate && isCurrent() && socket?.connected) {
           socket.emit('ice-candidate', {
-            sessionId,
+            targetId: viewerId,
+            sessionId: entry.sessionId,
             candidate: event.candidate.toJSON()
           });
         }
       };
 
       connection.onconnectionstatechange = () => {
+        if (!isCurrent()) return;
         if (connection.connectionState === 'connected') {
-          clearConnectionTimeout();
-          clearIceDisconnectTimeout();
-          setWebRTCStatus('active', 'Трансляция активна');
+          clearHostConnectionTimers(entry);
+          setWebRTCStatus('active', roomConfig.maxViewers > 1 ? `Трансляция активна: ${hostConnections.size} соединений` : 'Трансляция активна');
           void updateRouteStatus(connection);
-        }
-
-        if (connection.connectionState === 'disconnected') {
-          setWebRTCStatus('connecting', 'Соединение нестабильно, пытаемся восстановить');
-          clearIceDisconnectTimeout();
-          iceDisconnectTimeoutId = window.setTimeout(() => {
-            if (connection.connectionState === 'disconnected') {
-              closeForCriticalError('WebRTC-соединение со зрителем потеряно.');
-            }
-          }, 5_000);
-        }
-
-        if (connection.connectionState === 'failed') {
-          closeForCriticalError('WebRTC-соединение со зрителем потеряно.');
+        } else if (connection.connectionState === 'disconnected') {
+          setWebRTCStatus('connecting', 'Соединение со зрителем нестабильно');
+          startHostIceDisconnectTimeout('WebRTC-соединение со зрителем потеряно.');
+        } else if (connection.connectionState === 'failed') {
+          handleHostConnectionFailure(viewerId, 'WebRTC-соединение со зрителем потеряно.');
         }
       };
 
       connection.oniceconnectionstatechange = () => {
+        if (!isCurrent()) return;
         console.info('Host ICE state:', connection.iceConnectionState);
         if (connection.iceConnectionState === 'checking') {
-          setWebRTCStatus('connecting', 'Поиск сетевого маршрута');
-        }
-        if (connection.iceConnectionState === 'connected' || connection.iceConnectionState === 'completed') {
-          clearIceDisconnectTimeout();
+          setWebRTCStatus('connecting', 'Поиск сетевых маршрутов');
+        } else if (connection.iceConnectionState === 'connected' || connection.iceConnectionState === 'completed') {
+          window.clearTimeout(entry.iceDisconnectTimeoutId);
+          entry.iceDisconnectTimeoutId = null;
           void updateRouteStatus(connection);
-        }
-        if (connection.iceConnectionState === 'disconnected') {
-          clearIceDisconnectTimeout();
-          iceDisconnectTimeoutId = window.setTimeout(() => {
-            if (connection.iceConnectionState === 'disconnected') {
-              closeForCriticalError('ICE-соединение со зрителем было разорвано.');
-            }
-          }, 5_000);
-        }
-        if (connection.iceConnectionState === 'failed') {
-          closeForCriticalError('Не удалось установить ICE-соединение со зрителем.');
+        } else if (connection.iceConnectionState === 'disconnected') {
+          startHostIceDisconnectTimeout('ICE-соединение со зрителем было разорвано.');
+        } else if (connection.iceConnectionState === 'failed') {
+          handleHostConnectionFailure(viewerId, 'Не удалось установить ICE-соединение со зрителем.');
         }
       };
 
@@ -469,19 +524,18 @@
         const offer = await connection.createOffer();
         await connection.setLocalDescription(offer);
 
-        if (hostPeerConnection === connection && viewerConnected) {
+        if (isCurrent() && viewerIds.has(viewerId)) {
           setWebRTCStatus('connecting', 'Установка соединения');
-          startConnectionTimeout(connection, 'Подключение к зрителю не удалось установить вовремя.');
+          startHostConnectionTimeout();
           socket.emit('webrtc-offer', {
-            sessionId,
+            targetId: viewerId,
+            sessionId: entry.sessionId,
             sdp: connection.localDescription
           });
         }
       } catch (error) {
         console.error('Не удалось создать WebRTC offer:', error);
-        if (hostPeerConnection === connection) {
-          closeForCriticalError('Не удалось подготовить трансляцию для зрителя.');
-        }
+        if (isCurrent()) handleHostConnectionFailure(viewerId, 'Не удалось подготовить трансляцию для зрителя.');
       }
     };
 
@@ -531,8 +585,8 @@
 
         stopShareButton.disabled = false;
         setShareState('active', `${describeCapture(videoTrack)} Трансляция активна. Ожидаем или подключаем зрителя.`);
-        setWebRTCStatus(viewerConnected ? 'connecting' : 'waiting', viewerConnected ? 'Установка соединения' : 'Ожидание зрителя');
-        await createHostConnection();
+        setWebRTCStatus(viewerIds.size ? 'connecting' : 'waiting', viewerIds.size ? 'Установка соединений' : 'Ожидание зрителя');
+        await Promise.all([...viewerIds].map((viewerId) => createHostConnection(viewerId)));
       } catch (error) {
         const streamToStop = localStream;
         localStream = null;
@@ -772,8 +826,9 @@
       window.location.assign('/');
     });
 
-    socket.on('room-created', async () => {
+    socket.on('room-created', async (config) => {
       role = 'host';
+      setRoomConfig(config);
       pinForm.hidden = true;
       turnCredentialsPromise = loadTurnCredentials();
       await turnCredentialsPromise;
@@ -782,7 +837,7 @@
       setRole('host');
       clearError();
       roomTitle.textContent = 'Комната создана';
-      setRoomStatus('Вы ведущий. Отправьте эту ссылку или код зрителю.');
+      setRoomStatus(`Вы ведущий. Режим: ${roomConfig.modeLabel}. До ${roomConfig.maxViewers} зрителей.`);
       setConnectionStatus('waiting', 'Ожидание зрителя');
       setWebRTCStatus('waiting', 'Ожидание зрителя');
 
@@ -799,8 +854,9 @@
       }
     });
 
-    socket.on('room-joined', async () => {
+    socket.on('room-joined', async (config) => {
       role = 'viewer';
+      setRoomConfig(config);
       clearViewerRejoin();
       pinForm.hidden = true;
       turnCredentialsPromise = loadTurnCredentials();
@@ -810,7 +866,7 @@
       setRole('viewer');
       clearError();
       roomTitle.textContent = 'Вы подключились как зритель';
-      setRoomStatus('Ожидайте начала трансляции ведущим.');
+      setRoomStatus(`Ожидайте начала трансляции ведущим. Режим: ${roomConfig.modeLabel}.`);
       setConnectionStatus('waiting', 'Ожидание ведущего');
       setWebRTCStatus('waiting', 'Ожидание соединения');
 
@@ -820,23 +876,27 @@
       }
     });
 
-    socket.on('viewer-connected', async ({ message }) => {
-      viewerConnected = true;
+    socket.on('viewer-connected', async ({ viewerId, message, viewerCount, maxViewers }) => {
+      if (!viewerId) return;
+      viewerIds.add(viewerId);
+      setRoomConfig({ viewerCount, maxViewers });
       clearError();
-      roomTitle.textContent = 'Зритель подключился';
+      roomTitle.textContent = roomConfig.maxViewers > 1 ? 'Зрители подключаются' : 'Зритель подключился';
       setRoomStatus(message);
-      setConnectionStatus('active', 'Зритель подключён');
-      setWebRTCStatus(localStream ? 'connecting' : 'waiting', localStream ? 'Установка соединения' : 'Ожидание трансляции');
-      await createHostConnection();
+      updateHostViewerStatus();
+      if (!localStream) setWebRTCStatus('waiting', 'Ожидание трансляции');
+      await createHostConnection(viewerId);
     });
 
-    socket.on('viewer-disconnected', ({ message }) => {
-      viewerConnected = false;
-      closeHostConnection();
-      setWebRTCStatus('waiting', 'Ожидание нового зрителя');
-      roomTitle.textContent = 'Ожидание зрителя';
+    socket.on('viewer-disconnected', ({ viewerId, message, viewerCount, maxViewers }) => {
+      if (viewerId) {
+        viewerIds.delete(viewerId);
+        closeHostConnection(viewerId);
+      }
+      setRoomConfig({ viewerCount, maxViewers });
+      roomTitle.textContent = viewerIds.size ? 'Зрители подключены' : 'Ожидание зрителя';
       setRoomStatus(message);
-      setConnectionStatus('waiting', 'Ожидание зрителя');
+      updateHostViewerStatus();
     });
 
     socket.on('host-disconnected', ({ message }) => {
@@ -929,23 +989,27 @@
       }
     });
 
-    socket.on('webrtc-answer', async ({ sessionId, sdp }) => {
-      if (role !== 'host' || sessionId !== hostSessionId || !sdp || !hostPeerConnection) return;
+    socket.on('webrtc-answer', async ({ senderId, sessionId, sdp }) => {
+      const entry = hostConnections.get(senderId);
+      if (role !== 'host' || !entry || sessionId !== entry.sessionId || !sdp) return;
 
       try {
-        await hostPeerConnection.setRemoteDescription(sdp);
-        await flushIceCandidates(hostPeerConnection, sessionId);
+        await entry.connection.setRemoteDescription(sdp);
+        await flushIceCandidates(entry.connection, sessionId);
       } catch (error) {
         console.error('Не удалось установить WebRTC answer:', error);
-        closeForCriticalError('Не удалось завершить WebRTC-подключение зрителя.');
+        handleHostConnectionFailure(senderId, 'Не удалось завершить WebRTC-подключение зрителя.');
       }
     });
 
-    socket.on('ice-candidate', async ({ sessionId, candidate }) => {
+    socket.on('ice-candidate', async ({ senderId, sessionId, candidate }) => {
       if (!sessionId || !candidate) return;
 
-      if (role === 'host' && sessionId === hostSessionId) {
-        await addIceCandidate(hostPeerConnection, sessionId, candidate);
+      if (role === 'host') {
+        const entry = hostConnections.get(senderId);
+        if (entry && sessionId === entry.sessionId) {
+          await addIceCandidate(entry.connection, sessionId, candidate);
+        }
       }
 
       if (role === 'viewer' && (!viewerSessionId || sessionId === viewerSessionId)) {
@@ -1000,12 +1064,27 @@
   const joinForm = document.querySelector('#join-room-form');
   const roomCodeInput = document.querySelector('#room-code');
   const createPinInput = document.querySelector('#room-pin-create');
+  const createModeInput = document.querySelector('#room-mode-create');
+  const createModeHint = document.querySelector('#room-mode-hint');
   const status = document.querySelector('#status');
   const createButton = createForm.querySelector('button');
 
   function setStatus(message) {
     status.textContent = message;
   }
+
+  const roomModeHints = {
+    direct: 'Только STUN: соединение не будет использовать TURN и может не установиться в закрытых сетях.',
+    reliable: 'Надёжный режим подключается напрямую, а TURN используется только при необходимости.',
+    group: 'До шести зрителей: ведущий отправляет отдельный поток каждому, поэтому нужна хорошая исходящая скорость.'
+  };
+
+  const updateRoomModeHint = () => {
+    createModeHint.textContent = roomModeHints[createModeInput.value] || roomModeHints.reliable;
+  };
+
+  createModeInput.addEventListener('change', updateRoomModeHint);
+  updateRoomModeHint();
 
   const setCreateAvailability = (available) => {
     createButton.disabled = !available;
@@ -1028,6 +1107,7 @@
     event.preventDefault();
     const button = createButton;
     const pin = createPinInput.value.trim();
+    const mode = createModeInput.value;
     if (pin && !/^\d{4,8}$/.test(pin)) {
       setStatus('PIN должен состоять из 4–8 цифр.');
       return;
@@ -1041,7 +1121,7 @@
       return;
     }
 
-    socket.timeout(5_000).emit('create-room', { pin }, (error, response) => {
+    socket.timeout(5_000).emit('create-room', { pin, mode }, (error, response) => {
       if (error || !response?.ok) {
         button.disabled = false;
         setStatus('Не удалось создать комнату. Попробуйте ещё раз.');
