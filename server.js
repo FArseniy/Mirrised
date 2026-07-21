@@ -29,6 +29,11 @@ const TURN_URLS = (process.env.TURN_URL || '')
   .filter(Boolean);
 const TURN_SHARED_SECRET = process.env.TURN_SHARED_SECRET || '';
 const TURN_TTL_SECONDS = Math.min(Math.max(Number(process.env.TURN_TTL_SECONDS) || 3600, 600), 24 * 60 * 60);
+const ROOM_MODES = Object.freeze({
+  direct: { id: 'direct', maxViewers: 1, allowTurn: false, label: 'P2P напрямую' },
+  reliable: { id: 'reliable', maxViewers: 1, allowTurn: true, label: 'P2P с TURN' },
+  group: { id: 'group', maxViewers: 6, allowTurn: true, label: 'Группа до 6 зрителей' }
+});
 const SIGNAL_RATE_LIMITS = {
   'webrtc-offer': { windowMs: 60_000, max: 10 },
   'webrtc-answer': { windowMs: 60_000, max: 10 },
@@ -108,9 +113,9 @@ function createSecret() {
   return crypto.randomBytes(32).toString('base64url');
 }
 
-function createIceServers() {
+function createIceServers(allowTurn = true) {
   const iceServers = [{ urls: DEFAULT_STUN_URL }];
-  if (!TURN_URLS.length || !TURN_SHARED_SECRET) return iceServers;
+  if (!allowTurn || !TURN_URLS.length || !TURN_SHARED_SECRET) return iceServers;
 
   // Coturn's REST API scheme: username is an expiry timestamp plus an opaque suffix.
   const expiresAt = Math.floor(Date.now() / 1000) + TURN_TTL_SECONDS;
@@ -135,6 +140,21 @@ function normalizePin(pin) {
   if (typeof pin !== 'string') return undefined;
   const normalizedPin = pin.trim();
   return PIN_PATTERN.test(normalizedPin) ? normalizedPin : undefined;
+}
+
+function normalizeRoomMode(mode) {
+  if (mode === undefined || mode === null || mode === '') return ROOM_MODES.reliable;
+  return typeof mode === 'string' ? ROOM_MODES[mode] || null : null;
+}
+
+function roomDetails(room) {
+  return {
+    mode: room.mode.id,
+    modeLabel: room.mode.label,
+    maxViewers: room.mode.maxViewers,
+    allowTurn: room.mode.allowTurn,
+    viewerCount: room.viewerIds.size
+  };
 }
 
 async function hashSecret(secret, salt = crypto.randomBytes(16)) {
@@ -189,7 +209,7 @@ function closeRoom(roomId, message) {
   const room = rooms.get(roomId);
   if (!room) return;
 
-  for (const socketId of [room.hostId, room.viewerId]) {
+  for (const socketId of [room.hostId, ...room.viewerIds]) {
     if (!socketId) continue;
     const participant = io.sockets.sockets.get(socketId);
     if (participant) {
@@ -218,13 +238,19 @@ function relayToPeer(socket, eventName, payload, allowedRole) {
     return;
   }
 
-  const peerSocketId = allowedRole === 'host' ? room.viewerId : room.hostId;
+  const targetId = payload?.targetId;
+  const peerSocketId = allowedRole === 'host' ? targetId : room.hostId;
+  if (allowedRole === 'host' && (typeof targetId !== 'string' || !room.viewerIds.has(targetId))) {
+    sendRoomError(socket, 'Получатель сигнального сообщения больше не находится в комнате.');
+    return;
+  }
   const peer = peerSocketId && io.sockets.sockets.get(peerSocketId);
   if (!peer || peer.data.roomId !== socket.data.roomId) return;
 
   // SDP and ICE remain opaque: the server forwards them only to the room peer.
   touchRoom(room);
-  peer.emit(eventName, payload);
+  const { targetId: _targetId, ...signal } = payload || {};
+  peer.emit(eventName, { ...signal, senderId: socket.id });
 }
 
 function leaveCurrentRoom(socket) {
@@ -237,8 +263,8 @@ function leaveCurrentRoom(socket) {
   if (!room) return;
 
   if (role === 'host' && room.hostId === socket.id) {
-    if (room.viewerId) {
-      const viewer = io.sockets.sockets.get(room.viewerId);
+    for (const viewerId of room.viewerIds) {
+      const viewer = io.sockets.sockets.get(viewerId);
       viewer?.emit('host-disconnected', { message: 'Ведущий отключился. Трансляция завершена.' });
       clearSocketRoomData(viewer, roomId);
     }
@@ -247,11 +273,12 @@ function leaveCurrentRoom(socket) {
     return;
   }
 
-  if (role === 'viewer' && room.viewerId === socket.id) {
-    room.viewerId = null;
+  if (role === 'viewer' && room.viewerIds.delete(socket.id)) {
     touchRoom(room);
     io.to(room.hostId).emit('viewer-disconnected', {
-      message: 'Зритель отключился. Можно дождаться нового подключения.'
+      viewerId: socket.id,
+      message: 'Зритель отключился.',
+      ...roomDetails(room)
     });
     log('viewer_disconnected');
   }
@@ -324,6 +351,11 @@ io.on('connection', (socket) => {
         callback?.({ ok: false, message: 'PIN должен состоять из 4–8 цифр.' });
         return;
       }
+      const mode = normalizeRoomMode(payload?.mode);
+      if (!mode) {
+        callback?.({ ok: false, message: 'Выберите допустимый режим комнаты.' });
+        return;
+      }
 
       let roomId;
       do {
@@ -334,11 +366,12 @@ io.on('connection', (socket) => {
       const reservation = {
         hostToken: await hashSecret(hostToken),
         pin: pin ? await hashSecret(pin) : null,
+        mode,
         createdAt: Date.now()
       };
       pendingRooms.set(roomId, reservation);
-      log('room_reservation_created', { pinProtected: Boolean(pin) });
-      callback?.({ ok: true, roomId, hostToken });
+      log('room_reservation_created', { pinProtected: Boolean(pin), mode: mode.id });
+      callback?.({ ok: true, roomId, hostToken, mode: mode.id, maxViewers: mode.maxViewers });
     } catch (error) {
       logError('room_create_failed', error);
       callback?.({ ok: false, message: 'Не удалось создать комнату. Повторите попытку.' });
@@ -383,7 +416,8 @@ io.on('connection', (socket) => {
 
         room = {
           hostId: socket.id,
-          viewerId: null,
+          viewerIds: new Set(),
+          mode: reservation.mode,
           pin: reservation.pin,
           createdAt: Date.now(),
           lastActivityAt: Date.now()
@@ -393,17 +427,20 @@ io.on('connection', (socket) => {
         socket.join(roomId);
         socket.data.roomId = roomId;
         socket.data.role = 'host';
-        log('room_activated', { role: 'host', pinProtected: Boolean(room.pin) });
-        socket.emit('room-created', { roomId, role: 'host', pinRequired: Boolean(room.pin) });
+        log('room_activated', { role: 'host', pinProtected: Boolean(room.pin), mode: room.mode.id });
+        socket.emit('room-created', { roomId, role: 'host', pinRequired: Boolean(room.pin), ...roomDetails(room) });
         return;
       }
 
-      if (wantsToHost || room.hostId === socket.id || room.viewerId === socket.id) {
+      if (wantsToHost || room.hostId === socket.id || room.viewerIds.has(socket.id)) {
         sendRoomError(socket, 'Вы уже подключены к этой комнате или не можете занять роль ведущего.');
         return;
       }
-      if (room.viewerId) {
-        socket.emit('room-full', { message: 'В комнате уже есть ведущий и зритель.' });
+      if (room.viewerIds.size >= room.mode.maxViewers) {
+        socket.emit('room-full', {
+          message: `В комнате уже находится максимум зрителей: ${room.mode.maxViewers}.`,
+          ...roomDetails(room)
+        });
         return;
       }
 
@@ -434,14 +471,18 @@ io.on('connection', (socket) => {
         clearPinAttempts(roomId, socket.data.clientIp);
       }
 
-      room.viewerId = socket.id;
+      room.viewerIds.add(socket.id);
       touchRoom(room);
       socket.join(roomId);
       socket.data.roomId = roomId;
       socket.data.role = 'viewer';
-      log('viewer_joined');
-      socket.emit('room-joined', { roomId, role: 'viewer' });
-      io.to(room.hostId).emit('viewer-connected', { message: 'Зритель подключился к комнате.' });
+      log('viewer_joined', { mode: room.mode.id, viewerCount: room.viewerIds.size });
+      socket.emit('room-joined', { roomId, role: 'viewer', ...roomDetails(room) });
+      io.to(room.hostId).emit('viewer-connected', {
+        viewerId: socket.id,
+        message: 'Зритель подключился к комнате.',
+        ...roomDetails(room)
+      });
     })().catch((error) => {
       logError('room_join_failed', error);
       sendRoomError(socket, 'Не удалось подключиться к комнате. Повторите попытку.');
@@ -457,8 +498,10 @@ io.on('connection', (socket) => {
     }
     relayToPeer(socket, 'ice-candidate', payload, socket.data.role);
   });
-  socket.on('get-turn-credentials', (callback) => {
-    if (!socket.data.roomId || !socket.data.role || !rooms.has(socket.data.roomId)) {
+  socket.on('get-turn-credentials', (payload, callback) => {
+    if (typeof payload === 'function') callback = payload;
+    const room = rooms.get(socket.data.roomId);
+    if (!socket.data.roomId || !socket.data.role || !room) {
       callback?.({ ok: false, message: 'Сначала подключитесь к активной комнате.' });
       return;
     }
@@ -466,9 +509,27 @@ io.on('connection', (socket) => {
       callback?.({ ok: false, message: 'Слишком много запросов TURN-данных. Повторите позже.' });
       return;
     }
-    callback?.({ ok: true, iceServers: createIceServers() });
+    callback?.({ ok: true, iceServers: createIceServers(room.mode.allowTurn), allowTurn: room.mode.allowTurn });
   });
-  socket.on('stream-stopped', (payload) => relayToPeer(socket, 'stream-stopped', payload, 'host'));
+  socket.on('stream-stopped', (payload) => {
+    if (socket.data.role !== 'host') {
+      sendRoomError(socket, 'Этот сигнальный запрос недоступен для вашей роли.');
+      return;
+    }
+    const room = rooms.get(socket.data.roomId);
+    if (!room) {
+      sendRoomError(socket, 'Комната больше не активна.');
+      return;
+    }
+    if (!checkRateLimit(`signal:stream-stopped:${socket.id}`, SIGNAL_RATE_LIMITS['stream-stopped'])) {
+      sendRoomError(socket, 'Слишком много сигнальных сообщений. Повторите позже.');
+      return;
+    }
+    for (const viewerId of room.viewerIds) {
+      const viewer = io.sockets.sockets.get(viewerId);
+      if (viewer?.data.roomId === socket.data.roomId) viewer.emit('stream-stopped', payload);
+    }
+  });
   socket.on('disconnect', () => leaveCurrentRoom(socket));
 });
 
