@@ -5,6 +5,24 @@
   };
   const WEBRTC_TIMEOUT_MS = 20_000;
   const MAX_PENDING_ICE_CANDIDATES = 128;
+  const SHARE_QUALITY_PRESETS = Object.freeze({
+    economy: {
+      video: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 15 } },
+      hint: 'До 720p и 15 fps — подходит для медленного соединения и экономит трафик.'
+    },
+    standard: {
+      video: { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } },
+      hint: 'До 1080p и 30 fps — сбалансированный режим для большинства трансляций.'
+    },
+    high: {
+      video: { width: { ideal: 2560 }, height: { ideal: 1440 }, frameRate: { ideal: 60 } },
+      hint: 'До 2K и 60 fps — нужна хорошая производительность и высокая исходящая скорость.'
+    },
+    maximum: {
+      video: true,
+      hint: 'Без ограничений: браузер может передать 2K/60 fps и выше, если это поддерживает выбранный экран.'
+    }
+  });
 
   function openRoom(roomId, isHost = false, hostToken = '') {
     const params = new URLSearchParams({ room: roomId });
@@ -36,6 +54,8 @@
     const remoteStreamState = document.querySelector('#remote-stream-state');
     const startShareButton = document.querySelector('#start-share');
     const stopShareButton = document.querySelector('#stop-share');
+    const shareQualitySelect = document.querySelector('#share-quality');
+    const shareQualityHint = document.querySelector('#share-quality-hint');
     const localPreview = document.querySelector('#local-preview');
     const remotePreview = document.querySelector('#remote-preview');
     const pinForm = document.querySelector('#room-pin-form');
@@ -165,6 +185,18 @@
 
     const setRemoteStreamState = (message) => {
       remoteStreamState.textContent = message;
+    };
+
+    const updateShareQualityHint = () => {
+      const preset = SHARE_QUALITY_PRESETS[shareQualitySelect?.value] || SHARE_QUALITY_PRESETS.standard;
+      shareQualityHint.textContent = preset.hint;
+    };
+
+    const describeCapture = (videoTrack) => {
+      const { width, height, frameRate } = videoTrack?.getSettings?.() || {};
+      if (!width || !height) return 'Качество определено браузером.';
+      const fps = Number.isFinite(frameRate) ? `, ${Math.round(frameRate)} fps` : '';
+      return `Захват: ${width}×${height}${fps}.`;
     };
 
     const loadTurnCredentials = () => new Promise((resolve) => {
@@ -343,6 +375,7 @@
       showVideoPlaceholder();
       startShareButton.disabled = false;
       stopShareButton.disabled = true;
+      shareQualitySelect.disabled = false;
       setShareState('stopped', message);
       setWebRTCStatus('ended', 'Трансляция завершена');
 
@@ -468,12 +501,14 @@
 
       clearError();
       startShareButton.disabled = true;
+      shareQualitySelect.disabled = true;
       setShareState('requesting', 'Запрашиваем разрешение на захват экрана…');
 
       try {
+        const quality = SHARE_QUALITY_PRESETS[shareQualitySelect.value] || SHARE_QUALITY_PRESETS.standard;
         // This call is only reached from the explicit button click above.
         const stream = await navigator.mediaDevices.getDisplayMedia({
-          video: true,
+          video: quality.video,
           audio: true
         });
 
@@ -495,10 +530,50 @@
         });
 
         stopShareButton.disabled = false;
-        setShareState('active', 'Трансляция активна. Ожидаем или подключаем зрителя.');
+        setShareState('active', `${describeCapture(videoTrack)} Трансляция активна. Ожидаем или подключаем зрителя.`);
         setWebRTCStatus(viewerConnected ? 'connecting' : 'waiting', viewerConnected ? 'Установка соединения' : 'Ожидание зрителя');
         await createHostConnection();
-      } catch (error…531 tokens truncated…я:', error);
+      } catch (error) {
+        const streamToStop = localStream;
+        localStream = null;
+        streamToStop?.getTracks().forEach((track) => track.stop());
+        localPreview.srcObject = null;
+        localPreview.hidden = true;
+        showVideoPlaceholder();
+        startShareButton.disabled = false;
+        stopShareButton.disabled = true;
+        shareQualitySelect.disabled = false;
+
+        console.error('Не удалось получить доступ к экрану:', error);
+
+        if (error?.name === 'AbortError') {
+          setShareState('error', 'Вы закрыли окно выбора экрана. Трансляция не началась.');
+          showError('Вы закрыли окно выбора экрана. Когда будете готовы, нажмите «Начать трансляцию» ещё раз.');
+          return;
+        }
+
+        if (error?.name === 'NotAllowedError') {
+          setShareState('error', 'Доступ к экрану не предоставлен. Попробуйте ещё раз, когда будете готовы.');
+          showError('Доступ к экрану не предоставлен. Захват запускается только после вашего выбора в системном окне браузера.');
+          return;
+        }
+
+        setShareState('error', 'Не удалось начать захват экрана. Проверьте настройки браузера и повторите попытку.');
+        showError('Не удалось начать захват экрана. Проверьте настройки браузера и повторите попытку.');
+      }
+    };
+
+    const createViewerConnection = (sessionId) => {
+      if (!window.RTCPeerConnection) {
+        closeForCriticalError('Ваш браузер не поддерживает WebRTC-трансляцию.');
+        return null;
+      }
+
+      let connection;
+      try {
+        connection = new RTCPeerConnection(rtcConfiguration);
+      } catch (error) {
+        console.error('Не удалось создать RTCPeerConnection зрителя:', error);
         closeForCriticalError('Не удалось создать WebRTC-соединение для просмотра.');
         return null;
       }
@@ -619,6 +694,8 @@
       }
     });
 
+    updateShareQualityHint();
+    shareQualitySelect.addEventListener('change', updateShareQualityHint);
     startShareButton.addEventListener('click', startSharing);
     stopShareButton.addEventListener('click', () => stopSharing());
 
