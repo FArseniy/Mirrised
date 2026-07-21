@@ -15,6 +15,8 @@ const PIN_PATTERN = /^\d{4,8}$/;
 const MAX_SOCKET_MESSAGE_BYTES = 64 * 1024;
 const MAX_ACTIVE_ROOMS = Math.min(Math.max(Number(process.env.MAX_ACTIVE_ROOMS) || 1_000, 1), 10_000);
 const MAX_PENDING_ROOMS = Math.min(Math.max(Number(process.env.MAX_PENDING_ROOMS) || 1_000, 1), 10_000);
+const SOCKET_PING_INTERVAL_MS = Math.min(Math.max(Number(process.env.SOCKET_PING_INTERVAL_MS) || 3_000, 1_000), 30_000);
+const SOCKET_PING_TIMEOUT_MS = Math.min(Math.max(Number(process.env.SOCKET_PING_TIMEOUT_MS) || 5_000, 1_000), 30_000);
 const PENDING_ROOM_TTL_MS = Number(process.env.PENDING_ROOM_TTL_MS) || 10 * 60 * 1000;
 const ROOM_IDLE_TTL_MS = Number(process.env.ROOM_IDLE_TTL_MS) || 30 * 60 * 1000;
 const ROOM_MAX_AGE_MS = Number(process.env.ROOM_MAX_AGE_MS) || 6 * 60 * 60 * 1000;
@@ -45,6 +47,8 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
   maxHttpBufferSize: MAX_SOCKET_MESSAGE_BYTES,
+  pingInterval: SOCKET_PING_INTERVAL_MS,
+  pingTimeout: SOCKET_PING_TIMEOUT_MS,
   cors: {
     origin: [...allowedOrigins],
     methods: ['GET', 'POST'],
