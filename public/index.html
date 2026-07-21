@@ -29,6 +29,13 @@
           <h2>Начните показ</h2>
           <p>Создайте приватную комнату и получите ссылку для зрителя.</p>
           <form id="create-room-form">
+            <label for="room-mode-create">Режим комнаты</label>
+            <select id="room-mode-create" name="room-mode-create">
+              <option value="direct">P2P напрямую — 1 зритель, только STUN</option>
+              <option value="reliable" selected>P2P с TURN — 1 зритель, с резервным маршрутом</option>
+              <option value="group">Группа — до 6 зрителей, P2P-сетка</option>
+            </select>
+            <p id="room-mode-hint" class="form-hint">Надёжный режим подключается напрямую, а TURN используется только при необходимости.</p>
             <label for="room-pin-create">PIN-код (необязательно)</label>
             <input id="room-pin-create" name="room-pin-create" type="password" inputmode="numeric" autocomplete="new-password" maxlength="8" pattern="[0-9]{4,8}" placeholder="4–8 цифр" />
             <button class="button button-primary" type="submit" disabled>Подключаемся…</button>
@@ -58,7 +65,7 @@
         </div>
         <ol class="steps-list">
           <li><strong>Создайте комнату.</strong> Ведущий получает приватную ссылку.</li>
-          <li><strong>Отправьте ссылку.</strong> В комнате может быть один зритель.</li>
+          <li><strong>Отправьте ссылку.</strong> Выберите приватный режим для одного зрителя или группу до шести человек.</li>
           <li><strong>Выберите экран.</strong> Браузер покажет системное окно выбора.</li>
         </ol>
       </section>
