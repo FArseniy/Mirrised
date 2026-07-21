@@ -23,6 +23,8 @@
     const connectionStatusCard = document.querySelector('#connection-status-card');
     const webrtcStatus = document.querySelector('#webrtc-status');
     const webrtcStatusCard = document.querySelector('#webrtc-status-card');
+    const routeStatus = document.querySelector('#route-status');
+    const routeStatusCard = document.querySelector('#route-status-card');
     const errorBox = document.querySelector('#error-box');
     const shareLink = document.querySelector('#share-link');
     const copyLinkButton = document.querySelector('#copy-link');
@@ -73,6 +75,53 @@
     const setWebRTCStatus = (status, message) => {
       webrtcStatusCard.dataset.status = status;
       webrtcStatus.textContent = message;
+    };
+
+    const setRouteStatus = (route, message) => {
+      routeStatusCard.dataset.route = route;
+      routeStatus.textContent = message;
+    };
+
+    const updateRouteStatus = async (connection) => {
+      if (!connection || connection.connectionState === 'closed') {
+        setRouteStatus('waiting', 'Определится после подключения');
+        return;
+      }
+
+      setRouteStatus('detecting', 'Определяем маршрут…');
+      try {
+        const stats = await connection.getStats();
+        let candidatePair = null;
+
+        for (const report of stats.values()) {
+          if (report.type === 'transport' && report.selectedCandidatePairId) {
+            candidatePair = stats.get(report.selectedCandidatePairId);
+            break;
+          }
+        }
+
+        if (!candidatePair) {
+          for (const report of stats.values()) {
+            if (report.type === 'candidate-pair' && (report.selected || (report.nominated && report.state === 'succeeded'))) {
+              candidatePair = report;
+              break;
+            }
+          }
+        }
+
+        if (!candidatePair) {
+          setRouteStatus('waiting', 'Маршрут пока не определён');
+          return;
+        }
+
+        const localCandidate = stats.get(candidatePair.localCandidateId);
+        const remoteCandidate = stats.get(candidatePair.remoteCandidateId);
+        const usesRelay = localCandidate?.candidateType === 'relay' || remoteCandidate?.candidateType === 'relay';
+        setRouteStatus(usesRelay ? 'relay' : 'p2p', usesRelay ? 'Через TURN-сервер' : 'P2P напрямую');
+      } catch (error) {
+        console.warn('Unable to determine the selected WebRTC route:', error);
+        setRouteStatus('waiting', 'Маршрут не удалось определить');
+      }
     };
 
     const setRole = (nextRole) => {
@@ -192,6 +241,7 @@
     const closeHostConnection = () => {
       clearConnectionTimeout();
       clearIceDisconnectTimeout();
+      setRouteStatus('waiting', 'Определится после подключения');
       const sessionId = hostSessionId;
       hostSessionId = null;
       pendingIceCandidates.delete(sessionId);
@@ -208,6 +258,7 @@
     const stopRemotePlayback = (message) => {
       clearConnectionTimeout();
       clearIceDisconnectTimeout();
+      setRouteStatus('waiting', 'Определится после подключения');
       const sessionId = viewerSessionId;
       viewerSessionId = null;
       pendingIceCandidates.delete(sessionId);
@@ -305,6 +356,7 @@
           clearConnectionTimeout();
           clearIceDisconnectTimeout();
           setWebRTCStatus('active', 'Трансляция активна');
+          void updateRouteStatus(connection);
         }
 
         if (connection.connectionState === 'disconnected') {
@@ -329,6 +381,7 @@
         }
         if (connection.iceConnectionState === 'connected' || connection.iceConnectionState === 'completed') {
           clearIceDisconnectTimeout();
+          void updateRouteStatus(connection);
         }
         if (connection.iceConnectionState === 'disconnected') {
           clearIceDisconnectTimeout();
@@ -495,6 +548,7 @@
           clearConnectionTimeout();
           clearIceDisconnectTimeout();
           setWebRTCStatus('active', 'Трансляция активна');
+          void updateRouteStatus(connection);
         }
 
         if (connection.connectionState === 'disconnected') {
@@ -519,6 +573,7 @@
         }
         if (connection.iceConnectionState === 'connected' || connection.iceConnectionState === 'completed') {
           clearIceDisconnectTimeout();
+          void updateRouteStatus(connection);
         }
         if (connection.iceConnectionState === 'disconnected') {
           clearIceDisconnectTimeout();
