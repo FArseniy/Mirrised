@@ -15,9 +15,12 @@ button:focus-visible, input:focus-visible, select:focus-visible, a:focus-visible
 .app-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: clamp(44px, 8vw, 88px); }
 .brand { display: inline-flex; align-items: center; gap: 10px; color: #fff; font-size: 1.08rem; font-weight: 800; text-decoration: none; letter-spacing: -.02em; }
 .brand-mark { display: grid; width: 30px; height: 30px; place-items: center; border-radius: 9px; background: #aebcff; color: #111936; font-size: 1.25rem; line-height: 1; }
+.header-actions { display: flex; align-items: center; gap: 14px; min-width: 0; }
 .secure-label, .back-link { color: #cbd3f6; font-size: .9rem; }
 .back-link { text-decoration: none; }
 .back-link:hover { color: #fff; }
+.service-link { border: 1px solid rgba(174, 188, 255, .55); border-radius: 999px; padding: 7px 11px; color: #e5e9ff; font-size: .82rem; font-weight: 800; text-decoration: none; white-space: nowrap; transition: background .15s ease, border-color .15s ease; }
+.service-link:hover { border-color: #cbd4ff; background: rgba(174, 188, 255, .15); }
 
 .hero { max-width: 760px; margin-bottom: 42px; }
 .eyebrow { margin: 0 0 10px; color: #b8c4ff; font-size: .78rem; font-weight: 800; letter-spacing: .11em; text-transform: uppercase; }
@@ -123,6 +126,7 @@ input:focus { border-color: #b0bdff; box-shadow: 0 0 0 3px rgba(176, 189, 255, .
   .page-shell { width: min(100% - 24px, 1120px); padding-top: 18px; }
   .app-header { margin-bottom: 42px; }
   .secure-label { display: none; }
+  .header-actions { gap: 8px; }
   .action-grid, .how-it-works, .room-details, .status-grid { grid-template-columns: 1fr; }
   .action-card p { min-height: auto; }
   .room-heading, .control-bar { align-items: stretch; flex-direction: column; }
