@@ -1,6 +1,3 @@
-Exit code: 0
-Wall time: 0.7 seconds
-Output:
 const { io: createClient } = require('socket.io-client');
 
 let nextClientNumber = 10;

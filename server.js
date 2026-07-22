@@ -1,6 +1,3 @@
-Exit code: 0
-Wall time: 0.7 seconds
-Output:
 const path = require('node:path');
 const crypto = require('node:crypto');
 const http = require('node:http');

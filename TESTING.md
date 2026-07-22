@@ -1,6 +1,3 @@
-Exit code: 0
-Wall time: 0.7 seconds
-Output:
 # Автоматическое тестирование Mirrised
 
 Тесты используют встроенный раннер Node.js (`node:test`) и `socket.io-client`.
