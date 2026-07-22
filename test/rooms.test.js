@@ -1,3 +1,6 @@
+Exit code: 0
+Wall time: 0.8 seconds
+Output:
 const assert = require('node:assert/strict');
 const { after, afterEach, before, test } = require('node:test');
 const {
@@ -214,3 +217,4 @@ test('removes expired reservations and inactive rooms during cleanup', async () 
   assert.match((await closed).message, /неактивност/i);
   assert.equal(rooms.has(roomId), false);
 });
+

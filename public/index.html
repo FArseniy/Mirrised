@@ -1,5 +1,8 @@
+Exit code: 0
+Wall time: 0.7 seconds
+Output:
 <!doctype html>
-<html lang="ru">
+<html lang="ru" data-theme="warm">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -7,95 +10,64 @@
     <title>Mirrised — трансляция экрана</title>
     <link rel="stylesheet" href="/style.css" />
   </head>
-  <body>
-    <main class="page-shell home-page">
-      <header class="app-header">
-        <a class="brand" href="/" aria-label="Mirrised — главная">
-          <span class="brand-mark" aria-hidden="true">↗</span>
-          <span>Mirrised</span>
-        </a>
-        <div class="header-actions">
-          <a class="service-link" href="https://echo.erised.click/" target="_blank" rel="noopener noreferrer">Echo — чат</a>
-          <span class="secure-label">Защищённое подключение</span>
+  <body data-page-title="title.home">
+    <main class="landing-page">
+      <header class="landing-header">
+        <div class="brand-cluster">
+          <a class="brand" href="/" aria-label="Mirrised — главная">mir<span>rised</span></a>
+          <a class="erised-link" href="https://www.erised.click/" target="_blank" rel="noopener noreferrer">.erised</a>
+        </div>
+        <div class="header-tools" data-i18n-aria="aria.interface">
+          <span class="privacy-pill" data-i18n="header.service">БЕЗ РЕГИСТРАЦИИ</span>
+          <button class="theme-toggle language-toggle" type="button" data-language-toggle aria-label="Язык"><span data-language-label>Русский</span><span aria-hidden="true">↔</span></button>
+          <button class="theme-toggle" type="button" data-theme-toggle aria-label="Палитра"><span data-theme-label>Тёплая</span><span aria-hidden="true">↔</span></button>
         </div>
       </header>
 
-      <section class="hero" aria-labelledby="page-title">
-        <p class="eyebrow">Трансляция экрана в браузере</p>
-        <h1 id="page-title">Покажите экран без установки программ</h1>
-        <p class="intro">Ведущий создаёт комнату, зритель открывает ссылку, а изображение передаётся напрямую между браузерами.</p>
-      </section>
+      <div class="landing-stage">
+        <div class="landing-aside">
+          <section class="hero" aria-labelledby="page-title">
+            <p class="eyebrow" data-i18n="home.eyebrow">ТРАНСЛЯЦИЯ ЭКРАНА / БРАУЗЕР</p>
+            <h1 id="page-title" data-i18n="home.title">ЭКРАН.<br />ССЫЛКА.<br />ПОКАЗ.</h1>
+            <p class="intro" data-i18n="home.intro">Создайте комнату за секунду. Передайте ссылку зрителю — изображение передаётся напрямую между браузерами без записи.</p>
+          </section>
+          <aside class="temporary-notice" role="note"><span aria-hidden="true">◷</span><p data-i18n="home.notice"><strong>Вы управляете показом.</strong> Браузер всегда просит выбрать экран вручную. Сервер не записывает видеопоток.</p></aside>
+          <form id="join-room-form" class="card join-card-home">
+            <p class="eyebrow" data-i18n="home.join.kicker">ЕСТЬ КОД ДОСТУПА?</p>
+            <h2 data-i18n="home.join.title">ВОЙТИ В КОМНАТУ</h2>
+            <label for="room-code" data-i18n="home.code.label">КОД КОМНАТЫ</label>
+            <input id="room-code" name="room-code" type="text" autocomplete="off" maxlength="22" placeholder="Код из ссылки ведущего" data-i18n-placeholder="home.code.placeholder" required />
+            <button class="button button-secondary" type="submit" data-i18n="home.join.action">ПОДКЛЮЧИТЬСЯ →</button>
+          </form>
+        </div>
 
-      <section class="action-grid" aria-label="Управление комнатой">
-        <article class="action-card action-card-primary">
-          <div class="card-icon" aria-hidden="true">1</div>
-          <h2>Начните показ</h2>
-          <p>Создайте приватную комнату и получите ссылку для зрителя.</p>
-          <form id="create-room-form">
-            <label for="room-mode-create">Режим комнаты</label>
+        <section class="action-grid" aria-label="Создать комнату">
+          <form id="create-room-form" class="card create-card">
+            <p class="eyebrow" data-i18n="home.create.kicker">НОВАЯ СЕССИЯ</p>
+            <h2 data-i18n="home.create.title">НАЧАТЬ ПОКАЗ</h2>
+            <p class="form-copy" data-i18n="home.create.copy">Создайте приватную комнату и получите ссылку для зрителя.</p>
+            <label for="room-mode-create" data-i18n="home.mode.label">РЕЖИМ КОМНАТЫ</label>
             <select id="room-mode-create" name="room-mode-create">
-              <option value="direct">P2P напрямую — 1 зритель, только STUN</option>
-              <option value="reliable" selected>P2P с TURN — 1 зритель, с резервным маршрутом</option>
-              <option value="group">Группа — до 6 зрителей, P2P-сетка</option>
+              <option value="direct" data-i18n="mode.direct">P2P НАПРЯМУЮ — 1 ЗРИТЕЛЬ, ТОЛЬКО STUN</option>
+              <option value="reliable" selected data-i18n="mode.reliable">P2P С TURN — 1 ЗРИТЕЛЬ, РЕЗЕРВНЫЙ МАРШРУТ</option>
+              <option value="group" data-i18n="mode.group">ГРУППА — ДО 6 ЗРИТЕЛЕЙ, P2P-СЕТКА</option>
             </select>
-            <p id="room-mode-hint" class="form-hint">Надёжный режим подключается напрямую, а TURN используется только при необходимости.</p>
-            <label for="room-pin-create">PIN-код (необязательно)</label>
-            <input id="room-pin-create" name="room-pin-create" type="password" inputmode="numeric" autocomplete="new-password" maxlength="8" pattern="[0-9]{4,8}" placeholder="4–8 цифр" />
-            <button class="button button-primary" type="submit" disabled>Подключаемся…</button>
+            <p id="room-mode-hint" class="form-hint"></p>
+            <label for="room-pin-create" data-i18n="home.pin.label">PIN-КОД (НЕОБЯЗАТЕЛЬНО)</label>
+            <input id="room-pin-create" name="room-pin-create" type="password" inputmode="numeric" autocomplete="new-password" maxlength="8" pattern="[0-9]{4,8}" placeholder="4–8 цифр" data-i18n-placeholder="home.pin.placeholder" />
+            <button class="button button-primary" type="submit" disabled data-i18n="home.create.loading">ПОДКЛЮЧАЕМСЯ…</button>
           </form>
-        </article>
-
-        <article class="action-card">
-          <div class="card-icon" aria-hidden="true">2</div>
-          <h2>Подключитесь к показу</h2>
-          <p>Введите код комнаты, который отправил ведущий.</p>
-          <form id="join-room-form">
-            <label for="room-code">Код комнаты</label>
-            <div class="input-row">
-              <input id="room-code" name="room-code" type="text" autocomplete="off" maxlength="22" placeholder="Код из ссылки ведущего" required />
-              <button class="button button-secondary" type="submit">Подключиться</button>
-            </div>
-          </form>
-        </article>
-      </section>
-
+          <a class="echo-cta" href="https://echo.erised.click/" target="_blank" rel="noopener noreferrer">
+            <span class="eyebrow">ECHO / MIRRISED</span><span class="echo-arrow" aria-hidden="true">↗</span>
+            <strong data-i18n="echo.home.title">НУЖЕН ЧАТ ВО ВРЕМЯ ПОКАЗА?</strong><span data-i18n="echo.home.copy">Откройте Echo для сообщений, ссылок и быстрой координации со зрителем.</span>
+          </a>
+        </section>
+      </div>
       <p id="status" class="status" role="status" aria-live="polite"></p>
-
-      <section class="how-it-works" aria-labelledby="how-title">
-        <div>
-          <p class="eyebrow">Как это работает</p>
-          <h2 id="how-title">Три простых шага</h2>
-        </div>
-        <ol class="steps-list">
-          <li><strong>Создайте комнату.</strong> Ведущий получает приватную ссылку.</li>
-          <li><strong>Отправьте ссылку.</strong> Выберите приватный режим для одного зрителя или группу до шести человек.</li>
-          <li><strong>Выберите экран.</strong> Браузер покажет системное окно выбора.</li>
-        </ol>
-      </section>
-
-      <aside class="notice" role="note">
-        <span aria-hidden="true">ⓘ</span>
-        <p>Вы сами выбираете, какой экран или окно показать. Захват не запускается автоматически, а сервер не записывает видеопоток.</p>
-      </aside>
-
-      <section class="echo-banner" aria-labelledby="echo-title">
-        <div>
-          <p class="eyebrow">На связи</p>
-          <h2 id="echo-title">Нужен чат во время показа?</h2>
-          <p>Откройте Echo для сообщений, ссылок и быстрой координации со зрителями.</p>
-        </div>
-        <a class="button button-echo" href="https://echo.erised.click/" target="_blank" rel="noopener noreferrer">Открыть Echo</a>
-      </section>
-
-      <footer class="site-footer">
-        <a class="github-link" href="https://github.com/FArseniy/Mirrised" target="_blank" rel="noopener noreferrer" aria-label="Открыть репозиторий Mirrised на GitHub">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C6.48 2 2 6.58 2 12.24c0 4.53 2.87 8.37 6.84 9.73.5.1.68-.22.68-.49 0-.24-.01-1.04-.01-1.89-2.78.62-3.37-1.2-3.37-1.2-.45-1.18-1.11-1.49-1.11-1.49-.91-.64.07-.63.07-.63 1 .07 1.53 1.06 1.53 1.06.9 1.57 2.35 1.12 2.92.86.09-.67.35-1.12.63-1.38-2.22-.26-4.56-1.15-4.56-5.1 0-1.13.39-2.05 1.04-2.78-.1-.26-.45-1.32.1-2.74 0 0 .85-.28 2.75 1.06A9.3 9.3 0 0 1 12 6.94c.85 0 1.7.12 2.5.34 1.9-1.34 2.75-1.06 2.75-1.06.55 1.42.2 2.48.1 2.74.65.73 1.04 1.65 1.04 2.78 0 3.96-2.34 4.84-4.57 5.1.36.32.68.92.68 1.86 0 1.34-.01 2.42-.01 2.75 0 .27.18.6.69.49A10.27 10.27 0 0 0 22 12.24C22 6.58 17.52 2 12 2Z" /></svg>
-          <span>GitHub</span>
-        </a>
-      </footer>
+      <footer class="site-footer"><a class="github-link" href="https://github.com/FArseniy/Mirrised" target="_blank" rel="noopener noreferrer">◉ <span>Исходный код на GitHub</span></a><a href="https://echo.erised.click/" target="_blank" rel="noopener noreferrer">Echo Chat</a><a href="https://www.erised.click/" target="_blank" rel="noopener noreferrer">.erised</a></footer>
     </main>
-
-    <script src="/socket.io/socket.io.js"></script>
-    <script src="/app.js"></script>
+    <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
+    <script src="/socket.io/socket.io.js"></script><script src="/app.js"></script>
   </body>
 </html>
+

@@ -1,3 +1,6 @@
+Exit code: 0
+Wall time: 0.7 seconds
+Output:
 {
   "name": "mirrised",
   "version": "1.0.0",
@@ -22,3 +25,4 @@
     "socket.io-client": "^4.8.1"
   }
 }
+

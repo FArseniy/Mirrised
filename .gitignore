@@ -1,3 +1,6 @@
+Exit code: 0
+Wall time: 0.7 seconds
+Output:
 node_modules/
 .env
 .env.*
@@ -5,3 +8,5 @@ node_modules/
 *.pem
 *.key
 npm-debug.log*
+.superdesign/tmp/
+

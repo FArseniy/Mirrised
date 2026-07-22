@@ -1,137 +1,31 @@
+Exit code: 0
+Wall time: 0.8 seconds
+Output:
 <!doctype html>
-<html lang="ru">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Комната трансляции экрана." />
-    <title>Mirrised — комната</title>
-    <link rel="stylesheet" href="/style.css" />
-  </head>
-  <body>
-    <main class="page-shell room-page">
-      <header class="app-header">
-        <a class="brand" href="/" aria-label="Mirrised — главная">
-          <span class="brand-mark" aria-hidden="true">↗</span>
-          <span>Mirrised</span>
-        </a>
-        <div class="header-actions">
-          <a class="service-link" href="https://echo.erised.click/" target="_blank" rel="noopener noreferrer">Echo — чат</a>
-          <a class="back-link" href="/">На главную</a>
-        </div>
-      </header>
-
-      <section class="room-card" aria-labelledby="room-title">
-        <div class="room-heading">
-          <div>
-            <p class="eyebrow">Комната трансляции</p>
-            <h1 id="room-title">Подключение к комнате…</h1>
-            <p id="room-status" class="room-note" role="status" aria-live="polite">Проверяем комнату…</p>
-          </div>
-          <span id="role-label" class="role-badge" data-role="pending">Роль: ожидание</span>
-        </div>
-
-        <section class="room-details" aria-label="Данные комнаты">
-          <div class="detail-card">
-            <span class="detail-label">Код комнаты</span>
-            <output id="room-id" class="room-id">—</output>
-          </div>
-          <div class="detail-card link-detail">
-            <label class="detail-label" for="share-link">Ссылка для зрителя</label>
-            <div class="copy-row">
-              <input id="share-link" type="text" readonly aria-label="Ссылка для зрителя" />
-              <button id="copy-link" class="button button-secondary button-compact" type="button" disabled>Копировать</button>
-            </div>
-          </div>
+<html lang="ru" data-theme="warm">
+  <head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="description" content="Комната трансляции Mirrised." /><title>Mirrised — комната</title><link rel="stylesheet" href="/style.css" /></head>
+  <body data-page-title="title.room">
+    <main class="room-page">
+      <header class="room-header"><div class="brand-cluster"><a class="brand" href="/">mir<span>rised</span></a><a class="erised-link" href="https://www.erised.click/" target="_blank" rel="noopener noreferrer">.erised</a></div><div class="header-tools"><span class="privacy-pill">WEBRTC</span><button class="theme-toggle language-toggle" type="button" data-language-toggle><span data-language-label>Русский</span><span>↔</span></button><button class="theme-toggle" type="button" data-theme-toggle><span data-theme-label>Тёплая</span><span>↔</span></button></div></header>
+      <section class="room-layout">
+        <aside class="room-sidebar">
+          <p class="eyebrow" data-i18n="room.kicker">КОМНАТА ТРАНСЛЯЦИИ</p><h1 id="room-title" data-i18n="room.connecting">ПОДКЛЮЧЕНИЕ…</h1><p id="room-status" class="room-note" role="status" aria-live="polite" data-i18n="room.checking">ПРОВЕРЯЕМ КОМНАТУ…</p>
+          <span id="role-label" class="role-badge" data-role="pending" data-i18n="role.pending">РОЛЬ: ОЖИДАНИЕ</span>
+          <div class="sidebar-data"><span class="detail-label" data-i18n="room.code">КОД КОМНАТЫ</span><output id="room-id" class="room-id">—</output></div>
+          <div class="sidebar-data"><label class="detail-label" for="share-link" data-i18n="room.link">ССЫЛКА ДЛЯ ЗРИТЕЛЯ</label><input id="share-link" type="text" readonly /><button id="copy-link" class="button button-secondary" type="button" disabled data-i18n="room.copy">КОПИРОВАТЬ</button></div>
+          <a class="echo-cta room-echo" href="https://echo.erised.click/" target="_blank" rel="noopener noreferrer"><span class="eyebrow">ECHO / MIRRISED</span><strong data-i18n="echo.room.title">ОБСУДИТЕ ПОКАЗ В ECHO</strong><span>↗</span></a>
+        </aside>
+        <section class="share-panel">
+          <div class="share-topbar"><div><span class="eyebrow" data-i18n="video.kicker">ВИДЕО</span><h2 data-i18n="video.title">ТРАНСЛЯЦИЯ ЭКРАНА</h2></div><div class="status-pills"><span id="connection-status-card" class="status-card" data-status="waiting"><b data-i18n="status.connection">ПОДКЛЮЧЕНИЕ</b><strong id="connection-status" data-i18n="status.waitHost">ОЖИДАНИЕ ВЕДУЩЕГО</strong></span><span id="webrtc-status-card" class="status-card" data-status="waiting"><b>WEBRTC</b><strong id="webrtc-status" data-i18n="status.waitConnection">ОЖИДАНИЕ СОЕДИНЕНИЯ</strong></span><span id="route-status-card" class="status-card" data-route="waiting"><b data-i18n="status.route">МАРШРУТ</b><strong id="route-status" data-i18n="status.routePending">ОПРЕДЕЛИТСЯ ПОЗЖЕ</strong></span></div></div>
+          <p id="error-box" class="error-box" role="alert" hidden></p>
+          <form id="room-pin-form" class="pin-form" hidden><p data-i18n="pin.copy">Комната защищена PIN-кодом. PIN не передаётся в ссылке.</p><label for="room-pin" data-i18n="pin.label">PIN-КОД КОМНАТЫ</label><input id="room-pin" type="password" inputmode="numeric" maxlength="8" required /><button id="submit-room-pin" class="button button-secondary" type="submit" data-i18n="pin.action">ПОДТВЕРДИТЬ</button><p id="pin-feedback" class="pin-feedback" role="status"></p></form>
+          <div class="video-stage"><div id="video-placeholder" class="video-placeholder"><span>▣</span><p data-i18n="video.placeholder">Видео появится здесь после начала трансляции.</p></div><video id="local-preview" class="local-preview" autoplay muted playsinline controls hidden></video><div id="viewer-stream" class="viewer-stream" hidden><p id="remote-stream-state" class="remote-stream-state" data-i18n="video.waiting">Ожидаем трансляцию ведущего.</p><video id="remote-preview" class="remote-preview" autoplay playsinline controls hidden></video></div></div>
+          <div class="share-controls"><section id="host-controls" hidden><p id="share-state" class="share-state" data-state="idle" data-i18n="share.idle">ТРАНСЛЯЦИЯ НЕ ЗАПУЩЕНА</p><label class="quality-control" for="share-quality"><span data-i18n="quality.label">КАЧЕСТВО ТРАНСЛЯЦИИ</span><select id="share-quality"><option value="economy" data-i18n="quality.economy">ЭКОНОМИЯ — ДО 720P, 30 FPS</option><option value="standard" selected data-i18n="quality.standard">СТАНДАРТ — ДО 1080P, 30 FPS</option><option value="crisp" data-i18n="quality.crisp">ЧЁТКОЕ — ДО 2K, 10 FPS</option><option value="high" data-i18n="quality.high">ВЫСОКОЕ — ДО 2K, 60 FPS</option></select></label><p id="share-quality-hint" class="quality-hint"></p><div class="share-actions"><button id="start-share" class="button button-primary" type="button" disabled data-i18n="share.start">НАЧАТЬ ТРАНСЛЯЦИЮ</button><button id="stop-share" class="button button-danger" type="button" disabled data-i18n="share.stop">ОСТАНОВИТЬ</button></div></section><button id="leave-room" class="button button-ghost" type="button" disabled data-i18n="room.leave">ВЫЙТИ ИЗ КОМНАТЫ</button></div>
+          <p class="privacy-note" data-i18n="room.privacy">Вы сами выбираете экран. Видеопоток не записывается и не сохраняется на сервере.</p>
         </section>
-
-        <section class="status-grid" aria-label="Статусы подключения">
-          <article id="connection-status-card" class="status-card" data-status="waiting">
-            <span class="status-label">Подключение</span>
-            <strong id="connection-status">Ожидание ведущего</strong>
-          </article>
-          <article id="webrtc-status-card" class="status-card" data-status="waiting">
-            <span class="status-label">WebRTC</span>
-            <strong id="webrtc-status">Ожидание соединения</strong>
-          </article>
-          <article id="route-status-card" class="status-card" data-route="waiting">
-            <span class="status-label">Маршрут</span>
-            <strong id="route-status">Определится после подключения</strong>
-          </article>
-        </section>
-
-        <p id="error-box" class="error-box" role="alert" hidden></p>
-
-        <form id="room-pin-form" class="pin-form" hidden>
-          <p>Комната защищена PIN-кодом. PIN не передаётся в ссылке.</p>
-          <label for="room-pin">PIN-код комнаты</label>
-          <div class="input-row">
-            <input id="room-pin" name="room-pin" type="password" inputmode="numeric" autocomplete="one-time-code" maxlength="8" pattern="[0-9]{4,8}" placeholder="4–8 цифр" required />
-            <button id="submit-room-pin" class="button button-secondary" type="submit">Подтвердить</button>
-          </div>
-          <p id="pin-feedback" class="pin-feedback" role="status" aria-live="polite"></p>
-        </form>
-
-        <section class="video-panel" aria-labelledby="video-title">
-          <div class="video-panel-heading">
-            <div>
-              <p class="eyebrow">Видео</p>
-              <h2 id="video-title">Трансляция экрана</h2>
-            </div>
-          </div>
-          <div class="video-stage">
-            <div id="video-placeholder" class="video-placeholder">
-              <span class="video-placeholder-icon" aria-hidden="true">▣</span>
-              <p>Видео появится здесь после начала трансляции.</p>
-            </div>
-            <video id="local-preview" class="local-preview" autoplay muted playsinline controls hidden></video>
-            <div id="viewer-stream" class="viewer-stream" hidden>
-              <p id="remote-stream-state" class="remote-stream-state" role="status" aria-live="polite">Ожидаем трансляцию ведущего.</p>
-              <video id="remote-preview" class="remote-preview" autoplay playsinline controls hidden></video>
-            </div>
-          </div>
-        </section>
-
-        <div class="control-bar">
-          <section id="host-controls" class="host-controls" hidden aria-label="Управление трансляцией">
-            <p id="share-state" class="share-state" data-state="idle" role="status" aria-live="polite">Трансляция не запущена</p>
-            <label class="quality-control" for="share-quality">
-              <span>Качество трансляции</span>
-              <select id="share-quality" aria-describedby="share-quality-hint">
-                <option value="economy">Экономия — до 720p, 30 fps</option>
-                <option value="standard" selected>Стандарт — до 1080p, 30 fps</option>
-                <option value="crisp">Чёткое — до 2K, 10 fps</option>
-                <option value="high">Высокое — до 2K, 60 fps</option>
-              </select>
-            </label>
-            <p id="share-quality-hint" class="quality-hint">Браузер подберёт доступное качество для выбранного профиля.</p>
-            <div class="share-actions">
-              <button id="start-share" class="button button-primary" type="button" disabled>Начать трансляцию</button>
-              <button id="stop-share" class="button button-danger" type="button" disabled>Остановить</button>
-            </div>
-          </section>
-          <button id="leave-room" class="button button-ghost" type="button" disabled>Выйти из комнаты</button>
-        </div>
-        <p class="privacy-note">Вы сами выбираете экран в системном окне браузера. Видеопоток не записывается и не сохраняется на сервере.</p>
-
-        <section class="echo-banner echo-banner-compact" aria-labelledby="echo-title">
-          <div>
-            <p class="eyebrow">На связи</p>
-            <h2 id="echo-title">Обсудите трансляцию в Echo</h2>
-            <p>Откройте чат в отдельной вкладке — трансляция останется активной.</p>
-          </div>
-          <a class="button button-echo" href="https://echo.erised.click/" target="_blank" rel="noopener noreferrer">Открыть Echo</a>
-        </section>
-
-        <footer class="site-footer">
-          <a class="github-link" href="https://github.com/FArseniy/Mirrised" target="_blank" rel="noopener noreferrer" aria-label="Открыть репозиторий Mirrised на GitHub">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2C6.48 2 2 6.58 2 12.24c0 4.53 2.87 8.37 6.84 9.73.5.1.68-.22.68-.49 0-.24-.01-1.04-.01-1.89-2.78.62-3.37-1.2-3.37-1.2-.45-1.18-1.11-1.49-1.11-1.49-.91-.64.07-.63.07-.63 1 .07 1.53 1.06 1.53 1.06.9 1.57 2.35 1.12 2.92.86.09-.67.35-1.12.63-1.38-2.22-.26-4.56-1.15-4.56-5.1 0-1.13.39-2.05 1.04-2.78-.1-.26-.45-1.32.1-2.74 0 0 .85-.28 2.75 1.06A9.3 9.3 0 0 1 12 6.94c.85 0 1.7.12 2.5.34 1.9-1.34 2.75-1.06 2.75-1.06.55 1.42.2 2.48.1 2.74.65.73 1.04 1.65 1.04 2.78 0 3.96-2.34 4.84-4.57 5.1.36.32.68.92.68 1.86 0 1.34-.01 2.42-.01 2.75 0 .27.18.6.69.49A10.27 10.27 0 0 0 22 12.24C22 6.58 17.52 2 12 2Z" /></svg>
-            <span>GitHub</span>
-          </a>
-        </footer>
       </section>
-    </main>
-
-    <script src="/socket.io/socket.io.js"></script>
-    <script src="/app.js"></script>
+      <footer class="site-footer"><a class="github-link" href="https://github.com/FArseniy/Mirrised" target="_blank" rel="noopener noreferrer">◉ <span>Исходный код на GitHub</span></a><a href="https://echo.erised.click/" target="_blank" rel="noopener noreferrer">Echo Chat</a><a href="https://www.erised.click/" target="_blank" rel="noopener noreferrer">.erised</a></footer>
+    </main><div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div><script src="/socket.io/socket.io.js"></script><script src="/app.js"></script>
   </body>
 </html>
+
