@@ -214,4 +214,3 @@ test('removes expired reservations and inactive rooms during cleanup', async () 
   assert.match((await closed).message, /неактивност/i);
   assert.equal(rooms.has(roomId), false);
 });
-

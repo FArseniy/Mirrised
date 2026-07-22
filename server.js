@@ -577,4 +577,3 @@ module.exports = {
   isOriginAllowed,
   start
 };
-

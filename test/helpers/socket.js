@@ -64,4 +64,3 @@ async function joinViewer(viewerSocket, roomId, pin = '') {
 }
 
 module.exports = { once, emitWithAck, connect, createRoom, joinViewer };
-
