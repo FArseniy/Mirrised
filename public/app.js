@@ -8,7 +8,7 @@
       'home.create.kicker': 'НОВАЯ КОМНАТА', 'home.create.title': 'НАЧНИТЕ ПОКАЗ', 'home.create.copy': 'Создайте приватную комнату и получите ссылку для зрителя.', 'home.create.loading': 'ПОДКЛЮЧАЕМСЯ…',
       'home.join.kicker': 'ПО ССЫЛКЕ ИЛИ КОДУ', 'home.join.title': 'ПОДКЛЮЧИТЕСЬ', 'home.join.copy': 'Введите код комнаты, который отправил ведущий.', 'home.join.action': 'ПОДКЛЮЧИТЬСЯ',
       'home.mode.label': 'РЕЖИМ КОМНАТЫ', 'home.pin.label': 'PIN-КОД (НЕОБЯЗАТЕЛЬНО)', 'home.pin.placeholder': '4–8 цифр', 'home.code.label': 'КОД КОМНАТЫ', 'home.code.placeholder': 'Код из ссылки ведущего',
-      'mode.direct': 'P2P НАПРЯМУЮ — 1 ЗРИТЕЛЬ, ТОЛЬКО STUN', 'mode.reliable': 'P2P С TURN — 1 ЗРИТЕЛЬ, РЕЗЕРВНЫЙ МАРШРУТ', 'mode.group': 'ГРУППА — ДО 6 ЗРИТЕЛЕЙ, P2P-СЕТКА',
+      'mode.direct': 'P2P НАПРЯМУЮ — 1 ЗРИТЕЛЬ, ТОЛЬКО STUN', 'mode.reliable': 'P2P С TURN — 1 ЗРИТЕЛЬ, РЕЗЕРВНЫЙ МАРШРУТ', 'mode.group': 'ГРУППА — ДО 6 ЗРИТЕЛЕЙ, P2P-СЕТКА', 'mode.direct.short': 'P2P НАПРЯМУЮ', 'mode.direct.detail': 'Только прямой WebRTC-канал', 'mode.reliable.short': 'P2P С TURN', 'mode.reliable.detail': 'Прямой канал с резервным маршрутом', 'mode.group.short': 'ГРУППА ДО 6 ЗРИТЕЛЕЙ', 'mode.group.detail': 'Отдельный P2P-поток каждому зрителю',
       'home.how.kicker': 'КАК ЭТО РАБОТАЕТ', 'home.how.title': 'ТРИ ПРОСТЫХ ШАГА', 'home.step1.title': 'СОЗДАЙТЕ КОМНАТУ.', 'home.step1.copy': 'Ведущий получает приватную ссылку.', 'home.step2.title': 'ОТПРАВЬТЕ ССЫЛКУ.', 'home.step2.copy': 'Выберите режим для одного зрителя или группы до шести человек.', 'home.step3.title': 'ВЫБЕРИТЕ ЭКРАН.', 'home.step3.copy': 'Браузер откроет системное окно выбора.',
       'home.notice': 'Вы сами выбираете экран или окно. Захват никогда не запускается автоматически, а сервер не записывает видеопоток.',
       'room.kicker': 'КОМНАТА ТРАНСЛЯЦИИ', 'room.connecting': 'ПОДКЛЮЧЕНИЕ К КОМНАТЕ…', 'room.checking': 'ПРОВЕРЯЕМ КОМНАТУ…', 'room.code': 'КОД КОМНАТЫ', 'room.link': 'ССЫЛКА ДЛЯ ЗРИТЕЛЯ', 'room.copy': 'КОПИРОВАТЬ', 'room.leave': 'ВЫЙТИ ИЗ КОМНАТЫ', 'room.privacy': 'Вы сами выбираете экран в системном окне браузера. Видеопоток не записывается и не сохраняется на сервере.',
@@ -25,7 +25,7 @@
       'home.create.kicker': 'NEW ROOM', 'home.create.title': 'START A SHARE', 'home.create.copy': 'Create a private room and get a link for a viewer.', 'home.create.loading': 'CONNECTING…',
       'home.join.kicker': 'BY LINK OR CODE', 'home.join.title': 'JOIN A SHARE', 'home.join.copy': 'Enter the room code sent by the host.', 'home.join.action': 'JOIN ROOM',
       'home.mode.label': 'ROOM MODE', 'home.pin.label': 'PIN CODE (OPTIONAL)', 'home.pin.placeholder': '4–8 digits', 'home.code.label': 'ROOM CODE', 'home.code.placeholder': 'Code from the host link',
-      'mode.direct': 'P2P DIRECT — 1 VIEWER, STUN ONLY', 'mode.reliable': 'P2P WITH TURN — 1 VIEWER, FALLBACK ROUTE', 'mode.group': 'GROUP — UP TO 6 VIEWERS, P2P MESH',
+      'mode.direct': 'P2P DIRECT — 1 VIEWER, STUN ONLY', 'mode.reliable': 'P2P WITH TURN — 1 VIEWER, FALLBACK ROUTE', 'mode.group': 'GROUP — UP TO 6 VIEWERS, P2P MESH', 'mode.direct.short': 'P2P DIRECT', 'mode.direct.detail': 'Direct WebRTC connection only', 'mode.reliable.short': 'P2P WITH TURN', 'mode.reliable.detail': 'Direct connection with a fallback route', 'mode.group.short': 'GROUP UP TO 6 VIEWERS', 'mode.group.detail': 'A separate P2P stream for each viewer',
       'home.how.kicker': 'HOW IT WORKS', 'home.how.title': 'THREE SIMPLE STEPS', 'home.step1.title': 'CREATE A ROOM.', 'home.step1.copy': 'The host receives a private link.', 'home.step2.title': 'SEND THE LINK.', 'home.step2.copy': 'Choose a private mode or a group of up to six people.', 'home.step3.title': 'CHOOSE A SCREEN.', 'home.step3.copy': 'Your browser opens its native picker.',
       'home.notice': 'You choose the screen or window yourself. Capture never starts automatically and the server never records video.',
       'room.kicker': 'TRANSMISSION ROOM', 'room.connecting': 'CONNECTING TO ROOM…', 'room.checking': 'CHECKING THE ROOM…', 'room.code': 'ROOM CODE', 'room.link': 'VIEWER INVITATION LINK', 'room.copy': 'COPY', 'room.leave': 'LEAVE ROOM', 'room.privacy': 'You choose the screen in your browser’s system picker. The video stream is never recorded or stored on the server.',
@@ -1203,7 +1203,7 @@
   const createModeInput = document.querySelector('#room-mode-create');
   const createModeHint = document.querySelector('#room-mode-hint');
   const status = document.querySelector('#status');
-  const createButton = createForm.querySelector('button');
+  const createButton = createForm.querySelector('button[type="submit"]');
   const i18n = window.MirrisedI18n || { t: (key) => key, message: (value) => value };
 
   function setStatus(message) {
@@ -1220,8 +1220,55 @@
     createModeHint.textContent = i18n.message(roomModeHints[createModeInput.value] || roomModeHints.reliable);
   };
 
-  createModeInput.addEventListener('change', updateRoomModeHint);
-  updateRoomModeHint();
+  const modeSelect = document.querySelector('[data-mode-select]');
+  const modeTrigger = document.querySelector('#room-mode-trigger');
+  const modeValue = document.querySelector('#room-mode-value');
+  const modeOptions = [...document.querySelectorAll('.mode-select-option')];
+
+  const closeModeSelect = () => {
+    if (!modeSelect || !modeTrigger) return;
+    modeSelect.querySelector('.mode-select-options').hidden = true;
+    modeTrigger.setAttribute('aria-expanded', 'false');
+  };
+  const syncModeSelect = () => {
+    const selected = modeOptions.find((option) => option.dataset.modeValue === createModeInput.value) || modeOptions[0];
+    if (!selected) return;
+    modeValue.textContent = selected.querySelector('span')?.textContent || selected.textContent;
+    modeOptions.forEach((option) => option.setAttribute('aria-selected', String(option === selected)));
+    updateRoomModeHint();
+  };
+  const chooseMode = (mode) => {
+    if (![...createModeInput.options].some((option) => option.value === mode)) return;
+    createModeInput.value = mode;
+    syncModeSelect();
+  };
+
+  createModeInput.addEventListener('change', syncModeSelect);
+  modeTrigger?.addEventListener('click', () => {
+    const options = modeSelect.querySelector('.mode-select-options');
+    const willOpen = options.hidden;
+    options.hidden = !willOpen;
+    modeTrigger.setAttribute('aria-expanded', String(willOpen));
+    if (willOpen) (modeOptions.find((option) => option.dataset.modeValue === createModeInput.value) || modeOptions[0])?.focus();
+  });
+  modeTrigger?.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') { closeModeSelect(); modeTrigger.focus(); }
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); modeTrigger.click(); }
+  });
+  modeOptions.forEach((option) => {
+    option.addEventListener('click', () => { chooseMode(option.dataset.modeValue); closeModeSelect(); modeTrigger?.focus(); });
+    option.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') { closeModeSelect(); modeTrigger?.focus(); }
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        const index = modeOptions.indexOf(option);
+        modeOptions[(index + (event.key === 'ArrowDown' ? 1 : modeOptions.length - 1)) % modeOptions.length]?.focus();
+      }
+    });
+  });
+  document.addEventListener('click', (event) => { if (modeSelect && !modeSelect.contains(event.target)) closeModeSelect(); });
+  window.addEventListener('mirrised:localechange', syncModeSelect);
+  syncModeSelect();
 
   const setCreateAvailability = (available) => {
     createButton.disabled = !available;
