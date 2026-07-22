@@ -1,7 +1,3 @@
-Exit code: 0
-Wall time: 0.7 seconds
-Total output lines: 1286
-Output:
 (() => {
   const STORAGE_KEYS = Object.freeze({ locale: 'mirrised.locale', palette: 'mirrised.palette' });
   const DICTIONARY = Object.freeze({
