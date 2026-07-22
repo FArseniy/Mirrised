@@ -165,7 +165,657 @@
     const stopShareButton = document.querySelector('#stop-share');
     const shareQualitySelect = document.querySelector('#share-quality');
     const shareQualityHint = document.querySelector('#share-quality-hint');
-    const localPreview = document.querySelector('#local-p…6729 tokens truncated…= 'failed') {
+    const localPreview = document.querySelector('#local-preview');
+    const remotePreview = document.querySelector('#remote-preview');
+    const pinForm = document.querySelector('#room-pin-form');
+    const pinInput = document.querySelector('#room-pin');
+    const pinFeedback = document.querySelector('#pin-feedback');
+    const submitPinButton = document.querySelector('#submit-room-pin');
+    const params = new URLSearchParams(window.location.search);
+    const roomId = params.get('room')?.trim();
+    const isHostIntent = params.get('host') === '1';
+    const hostToken = params.get('token') || '';
+
+    let role = null;
+    let localStream = null;
+    let viewerPeerConnection = null;
+    let viewerSessionId = null;
+    let socket = null;
+    let rtcConfiguration = DEFAULT_RTC_CONFIGURATION;
+    let turnCredentialsPromise = Promise.resolve();
+    let connectionTimeoutId = null;
+    let iceDisconnectTimeoutId = null;
+    let hasSocketConnected = false;
+    let viewerPin = '';
+    let viewerRejoinTimer = null;
+    let viewerRejoinAttempts = 0;
+    const MAX_VIEWER_REJOIN_ATTEMPTS = 4;
+    const viewerIds = new Set();
+    const hostConnections = new Map();
+    const hostRouteStates = new Map();
+    let roomConfig = { mode: 'reliable', modeLabel: 'P2P с TURN', maxViewers: 1, allowTurn: true };
+    const pendingIceCandidates = new Map();
+
+    roomIdOutput.textContent = roomId || i18n.message('Не указан');
+
+    const setRoomStatus = (message) => {
+      roomStatus.textContent = i18n.message(message);
+    };
+
+    const setConnectionStatus = (status, message) => {
+      connectionStatusCard.dataset.status = status;
+      connectionStatus.textContent = i18n.message(message);
+    };
+
+    const setWebRTCStatus = (status, message) => {
+      webrtcStatusCard.dataset.status = status;
+      webrtcStatus.textContent = i18n.message(message);
+    };
+
+    const setRouteStatus = (route, message) => {
+      routeStatusCard.dataset.route = route;
+      routeStatus.textContent = i18n.message(message);
+    };
+
+    const updateHostRouteStatus = () => {
+      const routes = [...hostRouteStates.values()];
+      if (!routes.length) {
+        setRouteStatus('waiting', 'Определится после подключения');
+        return;
+      }
+      const hasP2P = routes.includes('p2p');
+      const hasRelay = routes.includes('relay');
+      if (hasP2P && hasRelay) {
+        setRouteStatus('mixed', 'P2P + TURN');
+      } else if (hasRelay) {
+        setRouteStatus('relay', 'Через TURN-сервер');
+      } else {
+        setRouteStatus('p2p', 'P2P напрямую');
+      }
+    };
+
+    const updateRouteStatus = async (connection, viewerId) => {
+      if (!connection || connection.connectionState === 'closed') {
+        if (viewerId) {
+          hostRouteStates.delete(viewerId);
+          updateHostRouteStatus();
+        } else {
+          setRouteStatus('waiting', 'Определится после подключения');
+        }
+        return;
+      }
+
+      if (!viewerId || !hostRouteStates.size) setRouteStatus('detecting', 'Определяем маршрут…');
+      try {
+        const stats = await connection.getStats();
+        let candidatePair = null;
+
+        for (const report of stats.values()) {
+          if (report.type === 'transport' && report.selectedCandidatePairId) {
+            candidatePair = stats.get(report.selectedCandidatePairId);
+            break;
+          }
+        }
+
+        if (!candidatePair) {
+          for (const report of stats.values()) {
+            if (report.type === 'candidate-pair' && (report.selected || (report.nominated && report.state === 'succeeded'))) {
+              candidatePair = report;
+              break;
+            }
+          }
+        }
+
+        if (!candidatePair) {
+          if (viewerId) updateHostRouteStatus();
+          else setRouteStatus('waiting', 'Маршрут пока не определён');
+          return;
+        }
+
+        const localCandidate = stats.get(candidatePair.localCandidateId);
+        const remoteCandidate = stats.get(candidatePair.remoteCandidateId);
+        const usesRelay = localCandidate?.candidateType === 'relay' || remoteCandidate?.candidateType === 'relay';
+        if (viewerId) {
+          hostRouteStates.set(viewerId, usesRelay ? 'relay' : 'p2p');
+          updateHostRouteStatus();
+        } else {
+          setRouteStatus(usesRelay ? 'relay' : 'p2p', usesRelay ? 'Через TURN-сервер' : 'P2P напрямую');
+        }
+      } catch (error) {
+        console.warn('Unable to determine the selected WebRTC route:', error);
+        if (viewerId) updateHostRouteStatus();
+        else setRouteStatus('waiting', 'Маршрут не удалось определить');
+      }
+    };
+
+    const setRole = (nextRole) => {
+      roleLabel.dataset.role = nextRole || 'pending';
+      roleLabel.textContent = nextRole === 'host'
+        ? i18n.t('role.host')
+        : nextRole === 'viewer'
+          ? i18n.t('role.viewer')
+          : i18n.t('role.pending');
+    };
+
+    const setRoomConfig = (config = {}) => {
+      roomConfig = {
+        ...roomConfig,
+        ...config
+      };
+    };
+
+    const updateHostViewerStatus = () => {
+      const count = viewerIds.size;
+      if (!count) {
+        setConnectionStatus('waiting', 'Ожидание зрителя');
+        if (localStream) setWebRTCStatus('waiting', 'Ожидание нового соединения');
+        return;
+      }
+      const label = roomConfig.maxViewers > 1
+        ? `Зрители: ${count} из ${roomConfig.maxViewers}`
+        : 'Зритель подключён';
+      setConnectionStatus('active', label);
+      if (localStream) setWebRTCStatus('connecting', 'Установка соединений со зрителями');
+    };
+
+    const showError = (message) => {
+      errorBox.textContent = i18n.message(message);
+      errorBox.hidden = false;
+      i18n.showToast('error', message);
+    };
+
+    const clearError = () => {
+      errorBox.textContent = '';
+      errorBox.hidden = true;
+    };
+
+    const showVideo = (video) => {
+      videoPlaceholder.hidden = true;
+      video.hidden = false;
+      if (video === remotePreview) remoteStreamState.hidden = true;
+    };
+
+    const showVideoPlaceholder = () => {
+      videoPlaceholder.hidden = false;
+    };
+
+    const setShareState = (state, message) => {
+      shareState.dataset.state = state;
+      shareState.textContent = i18n.message(message);
+    };
+
+    const setRemoteStreamState = (message) => {
+      remoteStreamState.textContent = i18n.message(message);
+    };
+
+    const updateShareQualityHint = () => {
+      const preset = SHARE_QUALITY_PRESETS[shareQualitySelect?.value] || SHARE_QUALITY_PRESETS.standard;
+      shareQualityHint.textContent = i18n.message(preset.hint);
+    };
+
+    const describeCapture = (videoTrack) => {
+      const { width, height, frameRate } = videoTrack?.getSettings?.() || {};
+      if (!width || !height) return 'Качество определено браузером.';
+      const fps = Number.isFinite(frameRate) ? `, ${Math.round(frameRate)} fps` : '';
+      return `Захват: ${width}×${height}${fps}.`;
+    };
+
+    const loadTurnCredentials = () => new Promise((resolve) => {
+      const timeoutId = window.setTimeout(resolve, 5_000);
+      socket.emit('get-turn-credentials', (response) => {
+        window.clearTimeout(timeoutId);
+        if (response?.ok && Array.isArray(response.iceServers) && response.iceServers.length) {
+          rtcConfiguration = { iceServers: response.iceServers };
+          if (typeof response.allowTurn === 'boolean') setRoomConfig({ allowTurn: response.allowTurn });
+        } else if (response?.message) {
+          console.warn('TURN credentials were not issued:', response.message);
+        }
+        resolve();
+      });
+    });
+
+    const createSessionId = () => (
+      crypto.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`
+    );
+
+    const clearConnectionTimeout = () => {
+      window.clearTimeout(connectionTimeoutId);
+      connectionTimeoutId = null;
+    };
+
+    const clearIceDisconnectTimeout = () => {
+      window.clearTimeout(iceDisconnectTimeoutId);
+      iceDisconnectTimeoutId = null;
+    };
+
+    const startConnectionTimeout = (connection, message) => {
+      clearConnectionTimeout();
+      connectionTimeoutId = window.setTimeout(() => {
+        if (connection.connectionState === 'connected' || connection.connectionState === 'closed') return;
+        console.warn('WebRTC connection timeout');
+        showError(message);
+        setWebRTCStatus('error', 'Подключение не установлено');
+        if (connection === viewerPeerConnection) stopRemotePlayback('Подключение к трансляции заняло слишком много времени.');
+      }, WEBRTC_TIMEOUT_MS);
+    };
+
+    const queueIceCandidate = (sessionId, candidate) => {
+      if (!sessionId || !candidate) return;
+      const queue = pendingIceCandidates.get(sessionId) || [];
+      if (queue.length >= MAX_PENDING_ICE_CANDIDATES) {
+        console.warn('Too many pending ICE candidates; dropping the oldest candidate.');
+        queue.shift();
+      }
+      queue.push(candidate);
+      pendingIceCandidates.set(sessionId, queue);
+    };
+
+    const addIceCandidate = async (connection, sessionId, candidate) => {
+      if (!candidate) return;
+
+      if (!connection || !connection.remoteDescription) {
+        queueIceCandidate(sessionId, candidate);
+        return;
+      }
+
+      try {
+        await connection.addIceCandidate(candidate);
+      } catch (error) {
+        console.warn('Не удалось добавить ICE-кандидат:', error);
+        setWebRTCStatus('error', 'Не удалось настроить сетевое соединение');
+        showError('Не удалось настроить сетевое соединение. Попробуйте переподключиться к комнате.');
+      }
+    };
+
+    const flushIceCandidates = async (connection, sessionId) => {
+      const queue = pendingIceCandidates.get(sessionId) || [];
+      pendingIceCandidates.delete(sessionId);
+
+      for (const candidate of queue) {
+        await addIceCandidate(connection, sessionId, candidate);
+      }
+    };
+
+    const clearHostConnectionTimers = (entry) => {
+      window.clearTimeout(entry?.connectionTimeoutId);
+      window.clearTimeout(entry?.iceDisconnectTimeoutId);
+      if (entry) {
+        entry.connectionTimeoutId = null;
+        entry.iceDisconnectTimeoutId = null;
+      }
+    };
+
+    const closeHostConnection = (viewerId) => {
+      if (!viewerId) {
+        for (const id of [...hostConnections.keys()]) closeHostConnection(id);
+        setRouteStatus('waiting', 'Определится после подключения');
+        return;
+      }
+
+      const entry = hostConnections.get(viewerId);
+      if (!entry) return;
+      clearHostConnectionTimers(entry);
+      pendingIceCandidates.delete(entry.sessionId);
+      entry.connection.onicecandidate = null;
+      entry.connection.onconnectionstatechange = null;
+      entry.connection.oniceconnectionstatechange = null;
+      entry.connection.onsignalingstatechange = null;
+      entry.connection.close();
+      hostConnections.delete(viewerId);
+      hostRouteStates.delete(viewerId);
+      updateHostRouteStatus();
+    };
+
+    const handleHostConnectionFailure = (viewerId, message) => {
+      console.warn(message);
+      closeHostConnection(viewerId);
+      if (localStream) {
+        setRoomStatus(message);
+        setWebRTCStatus('waiting', 'Ожидаем повторное подключение зрителя');
+      }
+    };
+
+    const stopRemotePlayback = (message) => {
+      clearConnectionTimeout();
+      clearIceDisconnectTimeout();
+      setRouteStatus('waiting', 'Определится после подключения');
+      const sessionId = viewerSessionId;
+      viewerSessionId = null;
+      pendingIceCandidates.delete(sessionId);
+
+      if (viewerPeerConnection) {
+        viewerPeerConnection.onicecandidate = null;
+        viewerPeerConnection.ontrack = null;
+        viewerPeerConnection.onconnectionstatechange = null;
+        viewerPeerConnection.oniceconnectionstatechange = null;
+        viewerPeerConnection.onsignalingstatechange = null;
+        viewerPeerConnection.close();
+        viewerPeerConnection = null;
+      }
+
+      remotePreview.pause();
+      remotePreview.srcObject = null;
+      remotePreview.hidden = true;
+      remoteStreamState.hidden = false;
+      setRemoteStreamState(message);
+      showVideoPlaceholder();
+    };
+
+    const preserveHostShare = (message) => {
+      if (!localStream) {
+        closeForCriticalError(message);
+        return;
+      }
+
+      console.warn(message);
+      closeHostConnection();
+      clearError();
+      roomTitle.textContent = 'Ожидание зрителя';
+      setRoomStatus(message);
+      setConnectionStatus('waiting', 'Ожидание зрителя');
+      setWebRTCStatus('waiting', 'Ожидание нового соединения');
+      setShareState('active', 'Захват экрана активен. Ожидаем нового зрителя.');
+      startShareButton.disabled = true;
+      stopShareButton.disabled = false;
+    };
+
+    const closeForCriticalError = (message) => {
+      if (role === 'host' && localStream) {
+        preserveHostShare(message);
+        return;
+      }
+      console.error(message);
+      closeHostConnection();
+      stopRemotePlayback(message);
+      const streamToStop = localStream;
+      localStream = null;
+      streamToStop?.getTracks().forEach((track) => track.stop());
+      localPreview.pause();
+      localPreview.srcObject = null;
+      localPreview.hidden = true;
+      showVideoPlaceholder();
+      startShareButton.disabled = true;
+      stopShareButton.disabled = true;
+      setShareState('error', message);
+      setWebRTCStatus('error', 'Соединение потеряно');
+      showError(message);
+    };
+
+    const stopSharing = (message = 'Трансляция остановлена') => {
+      const streamToStop = localStream;
+      const wasSharing = Boolean(streamToStop);
+      localStream = null;
+      closeHostConnection();
+
+      streamToStop?.getTracks().forEach((track) => track.stop());
+      localPreview.pause();
+      localPreview.srcObject = null;
+      localPreview.hidden = true;
+      showVideoPlaceholder();
+      startShareButton.disabled = false;
+      stopShareButton.disabled = true;
+      shareQualitySelect.disabled = false;
+      setShareState('stopped', message);
+      setWebRTCStatus('ended', 'Трансляция завершена');
+
+      if (wasSharing && role === 'host' && socket?.connected) {
+        socket.emit('stream-stopped', { message: 'Трансляция завершена.' });
+      }
+    };
+
+    const createHostConnection = async (viewerId) => {
+      if (!localStream || !viewerId || !viewerIds.has(viewerId) || hostConnections.has(viewerId)) return;
+
+      await turnCredentialsPromise;
+      if (!localStream || !viewerIds.has(viewerId) || hostConnections.has(viewerId)) return;
+      if (!window.RTCPeerConnection) {
+        closeForCriticalError('Ваш браузер не поддерживает WebRTC-трансляцию.');
+        return;
+      }
+
+      let connection;
+      try {
+        connection = new RTCPeerConnection(rtcConfiguration);
+      } catch (error) {
+        console.error('Не удалось создать RTCPeerConnection ведущего:', error);
+        setWebRTCStatus('error', 'Не удалось создать соединение со зрителем');
+        return;
+      }
+
+      const entry = {
+        connection,
+        sessionId: createSessionId(),
+        connectionTimeoutId: null,
+        iceDisconnectTimeoutId: null
+      };
+      hostConnections.set(viewerId, entry);
+
+      const isCurrent = () => hostConnections.get(viewerId) === entry;
+      const startHostConnectionTimeout = () => {
+        clearHostConnectionTimers(entry);
+        entry.connectionTimeoutId = window.setTimeout(() => {
+          if (isCurrent() && connection.connectionState !== 'connected' && connection.connectionState !== 'closed') {
+            handleHostConnectionFailure(viewerId, 'Подключение к зрителю не удалось установить вовремя.');
+          }
+        }, WEBRTC_TIMEOUT_MS);
+      };
+      const startHostIceDisconnectTimeout = (message) => {
+        window.clearTimeout(entry.iceDisconnectTimeoutId);
+        entry.iceDisconnectTimeoutId = window.setTimeout(() => {
+          if (isCurrent() && connection.connectionState === 'disconnected') {
+            handleHostConnectionFailure(viewerId, message);
+          }
+        }, 5_000);
+      };
+
+      connection.onicecandidate = (event) => {
+        if (event.candidate && isCurrent() && socket?.connected) {
+          socket.emit('ice-candidate', {
+            targetId: viewerId,
+            sessionId: entry.sessionId,
+            candidate: event.candidate.toJSON()
+          });
+        }
+      };
+
+      connection.onconnectionstatechange = () => {
+        if (!isCurrent()) return;
+        if (connection.connectionState === 'connected') {
+          clearHostConnectionTimers(entry);
+          setWebRTCStatus('active', roomConfig.maxViewers > 1 ? `Трансляция активна: ${hostConnections.size} соединений` : 'Трансляция активна');
+          void updateRouteStatus(connection, viewerId);
+        } else if (connection.connectionState === 'disconnected') {
+          setWebRTCStatus('connecting', 'Соединение со зрителем нестабильно');
+          startHostIceDisconnectTimeout('WebRTC-соединение со зрителем потеряно.');
+        } else if (connection.connectionState === 'failed') {
+          handleHostConnectionFailure(viewerId, 'WebRTC-соединение со зрителем потеряно.');
+        }
+      };
+
+      connection.oniceconnectionstatechange = () => {
+        if (!isCurrent()) return;
+        console.info('Host ICE state:', connection.iceConnectionState);
+        if (connection.iceConnectionState === 'checking') {
+          setWebRTCStatus('connecting', 'Поиск сетевых маршрутов');
+        } else if (connection.iceConnectionState === 'connected' || connection.iceConnectionState === 'completed') {
+          window.clearTimeout(entry.iceDisconnectTimeoutId);
+          entry.iceDisconnectTimeoutId = null;
+          void updateRouteStatus(connection, viewerId);
+        } else if (connection.iceConnectionState === 'disconnected') {
+          startHostIceDisconnectTimeout('ICE-соединение со зрителем было разорвано.');
+        } else if (connection.iceConnectionState === 'failed') {
+          handleHostConnectionFailure(viewerId, 'Не удалось установить ICE-соединение со зрителем.');
+        }
+      };
+
+      connection.onsignalingstatechange = () => {
+        console.info('Host signaling state:', connection.signalingState);
+      };
+
+      try {
+        localStream.getTracks().forEach((track) => connection.addTrack(track, localStream));
+        const offer = await connection.createOffer();
+        await connection.setLocalDescription(offer);
+
+        if (isCurrent() && viewerIds.has(viewerId)) {
+          setWebRTCStatus('connecting', 'Установка соединения');
+          startHostConnectionTimeout();
+          socket.emit('webrtc-offer', {
+            targetId: viewerId,
+            sessionId: entry.sessionId,
+            sdp: connection.localDescription
+          });
+        }
+      } catch (error) {
+        console.error('Не удалось создать WebRTC offer:', error);
+        if (isCurrent()) handleHostConnectionFailure(viewerId, 'Не удалось подготовить трансляцию для зрителя.');
+      }
+    };
+
+    const startSharing = async () => {
+      if (role !== 'host') return;
+
+      if (!socket?.connected) {
+        showError('Нет подключения к серверу. Сначала восстановите соединение с комнатой.');
+        return;
+      }
+
+      if (!navigator.mediaDevices?.getDisplayMedia) {
+        setShareState('error', 'Ваш браузер не поддерживает захват экрана.');
+        showError('Ваш браузер не поддерживает захват экрана.');
+        return;
+      }
+
+      clearError();
+      startShareButton.disabled = true;
+      shareQualitySelect.disabled = true;
+      setShareState('requesting', 'Запрашиваем разрешение на захват экрана…');
+
+      try {
+        const quality = SHARE_QUALITY_PRESETS[shareQualitySelect.value] || SHARE_QUALITY_PRESETS.standard;
+        // This call is only reached from the explicit button click above.
+        const stream = await navigator.mediaDevices.getDisplayMedia({
+          video: quality.video,
+          audio: true
+        });
+
+        localStream = stream;
+        localPreview.srcObject = stream;
+        showVideo(localPreview);
+        try {
+          await localPreview.play();
+        } catch (error) {
+          console.warn('Автовоспроизведение локального видео заблокировано:', error);
+          showError('Браузер не запустил предпросмотр автоматически. Нажмите кнопку воспроизведения на видео.');
+        }
+
+        const videoTrack = stream.getVideoTracks()[0];
+        videoTrack?.addEventListener('ended', () => {
+          if (localStream === stream) {
+            stopSharing('Доступ к экрану был остановлен в браузере.');
+          }
+        });
+
+        stopShareButton.disabled = false;
+        setShareState('active', `${describeCapture(videoTrack)} Трансляция активна. Ожидаем или подключаем зрителя.`);
+        setWebRTCStatus(viewerIds.size ? 'connecting' : 'waiting', viewerIds.size ? 'Установка соединений' : 'Ожидание зрителя');
+        await Promise.all([...viewerIds].map((viewerId) => createHostConnection(viewerId)));
+      } catch (error) {
+        const streamToStop = localStream;
+        localStream = null;
+        streamToStop?.getTracks().forEach((track) => track.stop());
+        localPreview.srcObject = null;
+        localPreview.hidden = true;
+        showVideoPlaceholder();
+        startShareButton.disabled = false;
+        stopShareButton.disabled = true;
+        shareQualitySelect.disabled = false;
+
+        console.error('Не удалось получить доступ к экрану:', error);
+
+        if (error?.name === 'AbortError') {
+          setShareState('error', 'Вы закрыли окно выбора экрана. Трансляция не началась.');
+          showError('Вы закрыли окно выбора экрана. Когда будете готовы, нажмите «Начать трансляцию» ещё раз.');
+          return;
+        }
+
+        if (error?.name === 'NotAllowedError') {
+          setShareState('error', 'Доступ к экрану не предоставлен. Попробуйте ещё раз, когда будете готовы.');
+          showError('Доступ к экрану не предоставлен. Захват запускается только после вашего выбора в системном окне браузера.');
+          return;
+        }
+
+        setShareState('error', 'Не удалось начать захват экрана. Проверьте настройки браузера и повторите попытку.');
+        showError('Не удалось начать захват экрана. Проверьте настройки браузера и повторите попытку.');
+      }
+    };
+
+    const createViewerConnection = (sessionId) => {
+      if (!window.RTCPeerConnection) {
+        closeForCriticalError('Ваш браузер не поддерживает WebRTC-трансляцию.');
+        return null;
+      }
+
+      let connection;
+      try {
+        connection = new RTCPeerConnection(rtcConfiguration);
+      } catch (error) {
+        console.error('Не удалось создать RTCPeerConnection зрителя:', error);
+        closeForCriticalError('Не удалось создать WebRTC-соединение для просмотра.');
+        return null;
+      }
+      viewerPeerConnection = connection;
+      viewerSessionId = sessionId;
+
+      connection.onicecandidate = (event) => {
+        if (event.candidate && viewerPeerConnection === connection && socket?.connected) {
+          socket.emit('ice-candidate', {
+            sessionId,
+            candidate: event.candidate.toJSON()
+          });
+        }
+      };
+
+      connection.ontrack = async (event) => {
+        const [stream] = event.streams;
+        if (!stream || viewerPeerConnection !== connection) return;
+
+        remotePreview.srcObject = stream;
+        showVideo(remotePreview);
+        setRemoteStreamState('Трансляция активна.');
+        setConnectionStatus('active', 'Трансляция активна');
+        setWebRTCStatus('active', 'Трансляция активна');
+
+        try {
+          await remotePreview.play();
+        } catch (error) {
+          setRemoteStreamState('Трансляция получена. Нажмите воспроизведение, если браузер его заблокировал.');
+        }
+      };
+
+      connection.onconnectionstatechange = () => {
+        if (connection.connectionState === 'connecting') {
+          setWebRTCStatus('connecting', 'Установка соединения');
+        }
+
+        if (connection.connectionState === 'connected') {
+          clearConnectionTimeout();
+          clearIceDisconnectTimeout();
+          setWebRTCStatus('active', 'Трансляция активна');
+          void updateRouteStatus(connection);
+        }
+
+        if (connection.connectionState === 'disconnected') {
+          setWebRTCStatus('connecting', 'Соединение нестабильно, пытаемся восстановить');
+          clearIceDisconnectTimeout();
+          iceDisconnectTimeoutId = window.setTimeout(() => {
+            if (connection.connectionState === 'disconnected') {
+              closeForCriticalError('WebRTC-соединение с трансляцией потеряно.');
+            }
+          }, 5_000);
+        }
+
+        if (connection.connectionState === 'failed') {
           closeForCriticalError('WebRTC-соединение с трансляцией потеряно.');
         }
       };
@@ -633,4 +1283,3 @@
     setCreateAvailability(socket.connected);
   });
 })();
-
