@@ -58,3 +58,7 @@ input,select{width:100%;min-height:var(--control-height);border:1px solid var(--
 
 /* Echo's left column intentionally pairs a full form card with a compact notice. */
 @media (min-width:821px){.landing-aside .temporary-notice{width:min(100%,520px)}}
+
+/* Measured from Echo: the compact invitation card and vertically centred action card. */
+@media (min-width:821px){.landing-aside .join-card-home{min-height:257px;margin-top:28px;padding:22px 24px}.landing-aside .join-card-home>h2{margin-top:8px;font-size:1.55rem}.landing-aside .join-card-home>label{margin-top:15px}.landing-aside .join-card-home .button{min-height:44px;margin-top:5px}.action-grid{align-self:center}.action-grid>.create-card{height:auto}}
+@media (min-width:821px) and (max-height:960px){.landing-aside .join-card-home{min-height:257px;margin-top:28px;padding:22px 24px}.landing-aside .join-card-home>h2{margin-top:8px;font-size:1.55rem}.landing-aside .join-card-home>label{margin-top:15px;font-size:.73rem}.landing-aside .join-card-home .button{min-height:44px;margin-top:5px}}
