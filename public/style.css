@@ -68,3 +68,6 @@ input,select{width:100%;min-height:var(--control-height);border:1px solid var(--
 @media (min-width:821px){.landing-aside .join-card-home{min-height:0;margin-top:24px;padding:20px 22px}.landing-aside .join-card-home .card-heading h2{margin-top:7px;font-size:1.55rem}.landing-aside .join-card-home .join-code-field{margin-top:15px}.landing-aside .join-card-home>button{min-height:42px;margin-top:5px}}
 @media (min-width:821px) and (max-height:960px){.landing-aside .join-card-home{min-height:0;margin-top:14px;padding:14px 16px}.landing-aside .join-card-home .card-heading h2{font-size:1.28rem}.landing-aside .join-card-home .join-code-field{margin-top:10px}.landing-aside .join-card-home>button{min-height:36px}}
 @media (min-width:2000px) and (min-height:950px){.landing-aside .join-card-home{margin-top:28px;padding:22px 24px}.landing-aside .join-card-home .card-heading h2{font-size:1.72rem}.landing-aside .join-card-home .field{gap:8px}.landing-aside .join-card-home>button{min-height:46px}}
+
+/* Echo uses a denser rhythm only when desktop height is constrained. */
+@media (min-width:821px) and (max-height:960px){.landing-aside .join-card-home .field{gap:4px}.landing-aside .join-card-home .form-error{min-height:16px;margin-top:5px}.landing-aside .join-card-home .button{min-height:36px;margin-top:5px}}
