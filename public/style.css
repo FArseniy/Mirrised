@@ -55,3 +55,6 @@ input,select{width:100%;min-height:var(--control-height);border:1px solid var(--
 /* Echo-parity left column: one measured stack and one deterministic divider. */
 @media (min-width:821px){.landing-stage{align-items:stretch}.landing-aside{position:relative;display:flex;min-width:0;min-height:0;align-self:stretch;flex-direction:column;border-right:0}.landing-aside::after{position:absolute;top:0;right:0;bottom:0;width:1px;background:var(--color-border);content:""}.landing-aside .hero,.landing-aside .temporary-notice,.landing-aside .join-card-home{width:100%}.landing-aside .join-card-home{min-height:256px}.action-grid{min-width:0;min-height:0;align-self:stretch}.action-grid>.create-card{height:auto;min-height:0}.hero .intro{width:min(100%,420px)}}
 @media (min-width:821px) and (max-height:960px){.landing-aside .join-card-home{min-height:0}}
+
+/* Echo's left column intentionally pairs a full form card with a compact notice. */
+@media (min-width:821px){.landing-aside .temporary-notice{width:min(100%,520px)}}
