@@ -6,8 +6,8 @@
       'header.service': 'SCREEN SHARE', 'header.room': 'SECURE ROOM',
       'home.eyebrow': 'ТРАНСЛЯЦИЯ ЭКРАНА / БРАУЗЕР', 'home.title': 'ПОКАЖИТЕ ЭКРАН.<br />БЕЗ УСТАНОВКИ.', 'home.intro': 'Ведущий создаёт комнату, зритель открывает ссылку, а изображение передаётся напрямую между браузерами.',
       'home.create.kicker': 'НОВАЯ КОМНАТА', 'home.create.title': 'НАЧНИТЕ ПОКАЗ', 'home.create.copy': 'Создайте приватную комнату и получите ссылку для зрителя.', 'home.create.loading': 'ПОДКЛЮЧАЕМСЯ…',
-      'home.join.kicker': 'ПО ССЫЛКЕ ИЛИ КОДУ', 'home.join.title': 'ПОДКЛЮЧИТЕСЬ', 'home.join.copy': 'Введите код комнаты, который отправил ведущий.', 'home.join.action': 'ПОДКЛЮЧИТЬСЯ',
-      'home.mode.label': 'РЕЖИМ КОМНАТЫ', 'home.pin.label': 'PIN-КОД (НЕОБЯЗАТЕЛЬНО)', 'home.pin.placeholder': '4–8 цифр', 'home.code.label': 'КОД КОМНАТЫ', 'home.code.placeholder': 'Код из ссылки ведущего',
+      'home.join.kicker': 'ЕСТЬ ПРИГЛАШЕНИЕ?', 'home.join.title': 'ВОЙТИ ПО КОДУ', 'home.join.copy': 'Введите код комнаты, который отправил ведущий.', 'home.join.action': 'ПРОДОЛЖИТЬ →',
+      'home.mode.label': 'РЕЖИМ КОМНАТЫ', 'home.pin.label': 'PIN-КОД (НЕОБЯЗАТЕЛЬНО)', 'home.pin.placeholder': '4–8 цифр', 'home.code.label': 'КОД КОМНАТЫ', 'home.code.placeholder': 'A7K9X2B4',
       'mode.direct': 'P2P НАПРЯМУЮ — 1 ЗРИТЕЛЬ, ТОЛЬКО STUN', 'mode.reliable': 'P2P С TURN — 1 ЗРИТЕЛЬ, РЕЗЕРВНЫЙ МАРШРУТ', 'mode.group': 'ГРУППА — ДО 6 ЗРИТЕЛЕЙ, P2P-СЕТКА', 'mode.direct.short': 'P2P НАПРЯМУЮ', 'mode.direct.detail': 'Только прямой WebRTC-канал', 'mode.reliable.short': 'P2P С TURN', 'mode.reliable.detail': 'Прямой канал с резервным маршрутом', 'mode.group.short': 'ГРУППА ДО 6 ЗРИТЕЛЕЙ', 'mode.group.detail': 'Отдельный P2P-поток каждому зрителю',
       'home.how.kicker': 'КАК ЭТО РАБОТАЕТ', 'home.how.title': 'ТРИ ПРОСТЫХ ШАГА', 'home.step1.title': 'СОЗДАЙТЕ КОМНАТУ.', 'home.step1.copy': 'Ведущий получает приватную ссылку.', 'home.step2.title': 'ОТПРАВЬТЕ ССЫЛКУ.', 'home.step2.copy': 'Выберите режим для одного зрителя или группы до шести человек.', 'home.step3.title': 'ВЫБЕРИТЕ ЭКРАН.', 'home.step3.copy': 'Браузер откроет системное окно выбора.',
       'home.notice': 'Вы сами выбираете экран или окно. Захват никогда не запускается автоматически, а сервер не записывает видеопоток.',
@@ -23,8 +23,8 @@
       'header.service': 'SCREEN SHARE', 'header.room': 'SECURE ROOM',
       'home.eyebrow': 'SCREEN SHARING / BROWSER', 'home.title': 'SHOW YOUR SCREEN.<br />NO INSTALL.', 'home.intro': 'The host creates a room, the viewer opens the link, and the image travels directly between browsers.',
       'home.create.kicker': 'NEW ROOM', 'home.create.title': 'START A SHARE', 'home.create.copy': 'Create a private room and get a link for a viewer.', 'home.create.loading': 'CONNECTING…',
-      'home.join.kicker': 'BY LINK OR CODE', 'home.join.title': 'JOIN A SHARE', 'home.join.copy': 'Enter the room code sent by the host.', 'home.join.action': 'JOIN ROOM',
-      'home.mode.label': 'ROOM MODE', 'home.pin.label': 'PIN CODE (OPTIONAL)', 'home.pin.placeholder': '4–8 digits', 'home.code.label': 'ROOM CODE', 'home.code.placeholder': 'Code from the host link',
+      'home.join.kicker': 'HAVE AN INVITATION?', 'home.join.title': 'JOIN BY CODE', 'home.join.copy': 'Enter the room code sent by the host.', 'home.join.action': 'CONTINUE →',
+      'home.mode.label': 'ROOM MODE', 'home.pin.label': 'PIN CODE (OPTIONAL)', 'home.pin.placeholder': '4–8 digits', 'home.code.label': 'ROOM CODE', 'home.code.placeholder': 'A7K9X2B4',
       'mode.direct': 'P2P DIRECT — 1 VIEWER, STUN ONLY', 'mode.reliable': 'P2P WITH TURN — 1 VIEWER, FALLBACK ROUTE', 'mode.group': 'GROUP — UP TO 6 VIEWERS, P2P MESH', 'mode.direct.short': 'P2P DIRECT', 'mode.direct.detail': 'Direct WebRTC connection only', 'mode.reliable.short': 'P2P WITH TURN', 'mode.reliable.detail': 'Direct connection with a fallback route', 'mode.group.short': 'GROUP UP TO 6 VIEWERS', 'mode.group.detail': 'A separate P2P stream for each viewer',
       'home.how.kicker': 'HOW IT WORKS', 'home.how.title': 'THREE SIMPLE STEPS', 'home.step1.title': 'CREATE A ROOM.', 'home.step1.copy': 'The host receives a private link.', 'home.step2.title': 'SEND THE LINK.', 'home.step2.copy': 'Choose a private mode or a group of up to six people.', 'home.step3.title': 'CHOOSE A SCREEN.', 'home.step3.copy': 'Your browser opens its native picker.',
       'home.notice': 'You choose the screen or window yourself. Capture never starts automatically and the server never records video.',
@@ -50,16 +50,16 @@
       'home.title': 'ЭКРАН.<br />ССЫЛКА.<br />ПОКАЗ.',
       'home.intro': 'Создайте комнату за секунду. Передайте ссылку зрителю — изображение передаётся напрямую между браузерами без записи.',
       'home.create.copy': 'Создайте приватную комнату и получите ссылку для зрителя.',
-      'home.join.kicker': 'ЕСТЬ КОД ДОСТУПА?',
-      'home.join.title': 'ВОЙТИ В КОМНАТУ'
+      'home.join.kicker': 'ЕСТЬ ПРИГЛАШЕНИЕ?',
+      'home.join.title': 'ВОЙТИ ПО КОДУ'
     },
     en: {
       'header.service': 'NO SIGN-UP',
       'home.title': 'SCREEN.<br />LINK.<br />SHARE.',
       'home.intro': 'Create a room in seconds. Send the link to a viewer — the image moves directly between browsers without recording.',
       'home.create.copy': 'Create a private room and get a link for a viewer.',
-      'home.join.kicker': 'HAVE AN ACCESS CODE?',
-      'home.join.title': 'JOIN A ROOM'
+      'home.join.kicker': 'HAVE AN INVITATION?',
+      'home.join.title': 'JOIN BY CODE'
     }
   });
   const t = (key) => ECHO_COPY[locale]?.[key] || DICTIONARY[locale]?.[key] || ECHO_COPY.ru[key] || DICTIONARY.ru[key] || key;
